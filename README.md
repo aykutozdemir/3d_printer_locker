@@ -4,6 +4,34 @@ This project adds **secure dual‑door locking** and **internal LED brightness c
 
 ---
 
+## 🚀 PlatformIO Optimized
+
+This project is fully optimized for **PlatformIO** with comprehensive build optimizations:
+
+- **Memory Usage**: 25.6% RAM (525/2048 bytes), 8.9% Flash (2908/30720 bytes)
+- **Build Time**: Sub-second compilation
+- **Multiple Build Profiles**: Standard, Size-optimized, Speed-optimized, Debug
+- **Professional Tooling**: VS Code integration, build scripts, Makefile support
+
+### Quick Start
+```bash
+# Standard build
+pio run
+
+# Size-optimized build  
+pio run -e nanoatmega328new_size
+
+# Upload to device
+pio run --target upload
+
+# Serial monitor
+pio device monitor
+```
+
+See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization information.
+
+---
+
 ## 1) Hardware Overview
 
 **Controller & Power**

@@ -1,58 +1,65 @@
 #include "YellowButtonTask.h"
 
-YellowButtonTask::YellowButtonTask() {
-    set_period(10); // Check button every 10ms for responsive debouncing
+YellowButtonTask::YellowButtonTask() : Task(F("YellowButton"))
+{
+    setPeriod(10); // Check button every 10ms for responsive debouncing
 }
 
-void YellowButtonTask::on_start() {
+void YellowButtonTask::on_start()
+{
     pinMode(YELLOW_BUTTON_PIN, INPUT_PULLUP);
     lastButtonState = HIGH;
     buttonPressed = false;
-    pressStartTime = 0;
+    // Timers will be initialized when button is pressed
     longPressDetected = false;
-    log_info(F("Task started"));
+    logInfo(F("Task started"));
 }
 
-void YellowButtonTask::step() {
+void YellowButtonTask::step()
+{
     bool currentButtonState = digitalRead(YELLOW_BUTTON_PIN);
-    
+
     // Detect button press (active low due to INPUT_PULLUP)
-    if (currentButtonState == LOW && lastButtonState == HIGH) {
+    if (currentButtonState == LOW && lastButtonState == HIGH)
+    {
         // Button just pressed - start debounce timer
         buttonPressed = true;
-        pressStartTime = OS.now();
+        debounceTimer = createTimerTyped<Timer8>(DEBOUNCE_TIME_MS);
+        longPressTimer = createTimerTyped<Timer16>(LONG_PRESS_TIME_MS);
         longPressDetected = false;
-        log_debug(F("Press detected"));
+        logDebug(F("Press detected"));
     }
     // Detect button release
-    else if (currentButtonState == HIGH && lastButtonState == LOW) {
+    else if (currentButtonState == HIGH && lastButtonState == LOW)
+    {
         // Button just released
-        if (buttonPressed) {
-            unsigned long pressDuration = OS.now() - pressStartTime;
-            
-            if (pressDuration >= DEBOUNCE_TIME_MS) { // Debounce check
-                if (pressDuration < LONG_PRESS_TIME_MS && !longPressDetected) {
+        if (buttonPressed)
+        {
+            if (debounceTimer.isExpired())   // Debounce check
+            {
+                if (!longPressDetected)
+                {
                     // Short click
-                    log_info(F("Short click detected"));
+                    logInfo(F("Short click detected"));
                     publish(TOPIC_BUTTON_EVENTS, EVT_BUTTON_SHORT_CLICK, 0, nullptr);
                 }
                 // Long press already handled in the press-hold logic
             }
-            
+
             buttonPressed = false;
-            log_debug(F("Release detected"));
+            logDebug(F("Release detected"));
         }
     }
     // Handle long press while button is held
-    else if (buttonPressed && currentButtonState == LOW) {
-        unsigned long pressDuration = OS.now() - pressStartTime;
-        
-        if (pressDuration >= LONG_PRESS_TIME_MS && !longPressDetected) {
+    else if (buttonPressed && currentButtonState == LOW)
+    {
+        if (longPressTimer.isExpired() && !longPressDetected)
+        {
             longPressDetected = true;
-            log_info(F("Long press detected"));
+            logInfo(F("Long press detected"));
             publish(TOPIC_BUTTON_EVENTS, EVT_BUTTON_LONG_CLICK, 0, nullptr);
         }
     }
-    
+
     lastButtonState = currentButtonState;
 }
