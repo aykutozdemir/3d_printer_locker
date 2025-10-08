@@ -161,6 +161,14 @@ void SerialCommandTask::processCommand(const char *command)
     {
         Serial.println(F("\033[2J\033[H")); // ANSI clear screen
     }
+    else if (equalsIgnoreCase_P(command, PSTR("resetlight")) || equalsIgnoreCase_P(command, PSTR("rl")))
+    {
+        handleResetLightOverride();
+    }
+    else if (equalsIgnoreCase_P(command, PSTR("lightstatus")) || equalsIgnoreCase_P(command, PSTR("ls")))
+    {
+        handleLightStatus();
+    }
     else
     {
         printUnknownCommand(command);
@@ -186,6 +194,8 @@ void SerialCommandTask::printHelp()
     Serial.println(F("test, t          - Test keypad"));
     Serial.println(F("buzzer, b        - Test buzzer"));
     Serial.println(F("clear, c         - Clear screen"));
+    Serial.println(F("resetlight, rl   - Reset light manual override"));
+    Serial.println(F("lightstatus, ls  - Check light status"));
     Serial.println(F(""));
     Serial.println(F("=== LED States ==="));
     Serial.println(F("led locked       - Red solid"));
@@ -337,31 +347,55 @@ void SerialCommandTask::handleKeypadTest()
 void SerialCommandTask::handleBuzzerTest()
 {
     Serial.println(F("=== Buzzer Test ==="));
-    Serial.println(F("Testing all buzzer sounds..."));
+    Serial.println(F("Testing simplified buzzer sounds..."));
 
-    // Test all buzzer sounds (no blocking delays - let buzzer task handle timing)
+    // Test simplified buzzer sounds
     Serial.println(F("1. Button press sound..."));
     publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0, nullptr);
+    delay(1000);
 
-    Serial.println(F("2. Keypad press sound..."));
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_KEYPAD_PRESS, 0, nullptr);
+    Serial.println(F("2. Password change sound..."));
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_CHANGE, 0, nullptr);
+    delay(2000); // Wait for triple-beep to complete
 
-    Serial.println(F("3. Wrong password sound..."));
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_WRONG_PASSWORD, 0, nullptr);
+    Serial.println(F("3. Password accept sound..."));
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0, nullptr);
+    delay(1000);
 
-    Serial.println(F("4. Correct password sound..."));
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_CORRECT_PASSWORD, 0, nullptr);
+    Serial.println(F("4. Door open sound..."));
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0, nullptr);
+    delay(1000);
 
-    Serial.println(F("5. Door released sound..."));
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_RELEASED, 0, nullptr);
+    Serial.println(F("5. Door close sound..."));
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_CLOSE, 0, nullptr);
+    delay(1000);
 
-    Serial.println(F("6. Door closed sound..."));
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_CLOSED, 0, nullptr);
-
-    Serial.println(F("7. Angry sound..."));
+    Serial.println(F("6. Angry sound..."));
     publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0, nullptr);
+    delay(1000);
 
-    Serial.println(F("Buzzer test complete! (Sounds will play sequentially)"));
+    Serial.println(F("Buzzer test complete!"));
+}
+
+void SerialCommandTask::handleResetLightOverride()
+{
+    Serial.println(F("=== Reset Light Override ==="));
+    Serial.println(F("Resetting manual override mode - MB sensor will control light again"));
+
+    // Send a special message to reset manual override
+    // We'll use a new event type for this
+    publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_RESET_OVERRIDE, 0, nullptr);
+
+    Serial.println(F("Manual override reset complete"));
+}
+
+void SerialCommandTask::handleLightStatus()
+{
+    Serial.println(F("=== Light Status ==="));
+    Serial.println(F("Check serial output for light control messages"));
+    Serial.println(F("Look for: 'MB sensor ON ignored (manual override)'"));
+    Serial.println(F("If you see that message, manual override is active"));
+    Serial.println(F("Use 'resetlight' command to disable manual override"));
 }
 
 void SerialCommandTask::handleLightCommand(const char *args)
@@ -372,12 +406,12 @@ void SerialCommandTask::handleLightCommand(const char *args)
     }
     if (strcasecmp(args, "on") == 0)
     {
-        logInfo(F("Turning light ON"));
+        logInfof(F("Turning light %S"), F("ON"));
         publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_TOGGLE, 1, nullptr);
     }
     else if (strcasecmp(args, "off") == 0)
     {
-        logInfo(F("Turning light OFF"));
+        logInfof(F("Turning light %S"), F("OFF"));
         publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_TOGGLE, 0, nullptr);
     }
     else if (strcasecmp(args, "toggle") == 0)

@@ -36,6 +36,6 @@ void DeviceRunningSensorTask::readDeviceRunningSensor()
         // Publish the state change
         publish(TOPIC_DEVICE_RUNNING_EVENTS, EVT_DEVICE_RUNNING_CHANGED, currentState ? 1 : 0, nullptr);
 
-        logInfof(F("State changed to %s"), currentState ? F("RUNNING") : F("STOPPED"));
+        logInfof(F("State changed to %S"), currentState ? F("RUNNING") : F("STOPPED"));
     }
 }

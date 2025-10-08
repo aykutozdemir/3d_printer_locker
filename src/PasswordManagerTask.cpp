@@ -16,10 +16,10 @@ void PasswordManagerTask::on_start()
     // Listen to yellow button short press for password change trigger
     subscribe(TOPIC_BUTTON_EVENTS);
 
-    logInfo(F("Task started - 4-digit password system"));
+    logInfo(F("Task started - 4-digit password"));
     // Load password from EEPROM if initialized
     loadPasswordFromEEPROM();
-    logInfof(F("Current password is %s"), correctPassword);
+    logInfof(F("Current password: %s"), correctPassword);
 }
 
 void PasswordManagerTask::on_msg(const MsgData &msg)
@@ -32,7 +32,7 @@ void PasswordManagerTask::on_msg(const MsgData &msg)
         case EVT_PASSWORD_SET_FACTORY:
             strcpy(correctPassword, DEFAULT_PASSWORD);
             savePasswordToEEPROM();
-            logInfo(F("Password set to factory default in RAM and EEPROM"));
+            logInfo(F("Password set to factory default"));
             break;
         case EVT_BUTTON_SHORT_CLICK:
             handleYellowShortPress();
@@ -41,7 +41,7 @@ void PasswordManagerTask::on_msg(const MsgData &msg)
         case EVT_KEYPAD_2_PRESSED:
         case EVT_KEYPAD_3_PRESSED:
         case EVT_KEYPAD_4_PRESSED:
-            logInfo(F("Keypad event received!"));
+            logInfo(F("Keypad event received"));
             if (currentState == PASSWORD_IDLE || currentState == PASSWORD_ENTERING ||
                     currentState == PASSWORD_CHANGE_ENTER || currentState == PASSWORD_CHANGE_CONFIRM)
             {
@@ -60,7 +60,7 @@ void PasswordManagerTask::on_msg(const MsgData &msg)
 
                 // Keypad press sound is now handled by KeypadTask
 
-                logInfof(F("Digit %u entered (%u/4)"), digit, digitCount);
+                logInfof(F("Digit %u (%u/4)"), digit, digitCount);
 
                 if (digitCount >= PASSWORD_LENGTH)
                 {
@@ -74,8 +74,10 @@ void PasswordManagerTask::on_msg(const MsgData &msg)
                         strcpy(newPasswordBuffer, enteredPassword);
                         resetEntryBuffer();
                         currentState = PASSWORD_CHANGE_CONFIRM;
-                        logInfo(F("Password change: enter new password again to confirm"));
-                        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0, nullptr);
+                        logInfo(F("Password change: enter again to confirm"));
+                        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0, nullptr);
+                        // Give more time for password confirmation (5 seconds)
+                        digitTimeoutTimer = createTimerTyped<Timer16>(5000);
                     }
                     else if (currentState == PASSWORD_CHANGE_CONFIRM)
                     {
@@ -85,15 +87,15 @@ void PasswordManagerTask::on_msg(const MsgData &msg)
                             // Save to EEPROM and update active password
                             strcpy(correctPassword, enteredPassword);
                             savePasswordToEEPROM();
-                            logInfo(F("Password change successful - saved to EEPROM"));
-                            // Confirmation beep (reuse correct password sound)
-                            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_CORRECT_PASSWORD, 0, nullptr);
+                            logInfo(F("Password change successful"));
+                            // Success beep (correct password sound)
+                            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0, nullptr);
                         }
                         else
                         {
-                            logWarn(F("Password change mismatch - keeping old password"));
-                            // Error beep (reuse wrong password sound)
-                            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_WRONG_PASSWORD, 0, nullptr);
+                            logWarn(F("Password change mismatch"));
+                            // Error beep (wrong password sound)
+                            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0, nullptr);
                         }
                         // Exit change mode
                         resetPassword();
@@ -120,7 +122,7 @@ void PasswordManagerTask::step()
     {
         if (digitTimeoutTimer.isExpired())
         {
-            logWarn(F("Timeout - clearing entered password"));
+            logWarn(F("Timeout - clearing password"));
             resetPassword();
         }
     }
@@ -128,7 +130,7 @@ void PasswordManagerTask::step()
     {
         if (digitTimeoutTimer.isExpired())
         {
-            logWarn(F("Timeout - no option selected, resetting"));
+            logWarn(F("Timeout - no option selected"));
             resetPassword();
         }
     }
@@ -140,24 +142,24 @@ void PasswordManagerTask::resetPassword()
     enteredPassword[0] = '\0';
     digitCount = 0;
     currentState = PASSWORD_IDLE;
-    logInfo(F("Reset to idle state"));
+    logInfo(F("Reset to idle"));
 }
 
 void PasswordManagerTask::checkPassword()
 {
-    logInfof(F("Checking %s against %s"), enteredPassword, correctPassword);
+    logInfof(F("Checking %s vs %s"), enteredPassword, correctPassword);
 
     if (strcmp(enteredPassword, correctPassword) == 0)
     {
         currentState = PASSWORD_CORRECT;
         logInfo(F("CORRECT - waiting for selection"));
-        logInfo(F("Press 1=Top, 2=Front, 3=Both doors, 4=Child Lock"));
+        logInfo(F("Press 1=Top, 2=Front, 3=Both, 4=Child Lock"));
 
         // Publish password correct event
         publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_CORRECT, 0, nullptr);
 
         // Play correct password sound
-        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_CORRECT_PASSWORD, 0, nullptr);
+        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0, nullptr);
 
         // Wait for door selection
         currentState = PASSWORD_WAITING_DOOR_SELECTION;
@@ -165,13 +167,13 @@ void PasswordManagerTask::checkPassword()
     }
     else
     {
-        logWarn(F("WRONG - no action taken"));
+        logWarn(F("WRONG - no action"));
 
         // Publish password wrong event
         publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_WRONG, 0, nullptr);
 
         // Play wrong password sound
-        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_WRONG_PASSWORD, 0, nullptr);
+        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0, nullptr);
 
         // Reset immediately (no blocking delay)
         resetPassword();
@@ -187,25 +189,21 @@ void PasswordManagerTask::handleDoorSelection(uint8_t digit)
         case 1:
             logInfo(F("Releasing TOP door"));
             publish(TOPIC_DOOR_EVENTS, EVT_DOOR_TOP_RELEASE, 0, nullptr);
-            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_TOP_DOOR_SELECTED, 0, nullptr);
             break;
 
         case 2:
             logInfo(F("Releasing FRONT door"));
             publish(TOPIC_DOOR_EVENTS, EVT_DOOR_FRONT_RELEASE, 0, nullptr);
-            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_FRONT_DOOR_SELECTED, 0, nullptr);
             break;
 
         case 3:
             logInfo(F("Releasing BOTH doors"));
             publish(TOPIC_DOOR_EVENTS, EVT_DOOR_BOTH_RELEASE, 0, nullptr);
-            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BOTH_DOORS_SELECTED, 0, nullptr);
             break;
 
         case 4:
             logInfo(F("Releasing CHILD LOCK"));
             publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_RELEASE, 0, nullptr);
-            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_CHILD_LOCK_SELECTED, 0, nullptr);
             break;
 
         default:
@@ -222,13 +220,13 @@ void PasswordManagerTask::handleYellowShortPress()
     // Only allow entering change mode right after a correct password
     if (currentState == PASSWORD_WAITING_DOOR_SELECTION)
     {
-        logInfo(F("Password change mode initiated (yellow short press)"));
+        logInfo(F("Password change mode initiated"));
         currentState = PASSWORD_CHANGE_ENTER;
         resetEntryBuffer();
-        // Triple short beep to indicate change mode
-        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0, nullptr);
-        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0, nullptr);
-        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0, nullptr);
+        // Single event - buzzer will handle triple-beep pattern internally
+        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_CHANGE, 0, nullptr);
+        // Give more time for password change (5 seconds instead of 3)
+        digitTimeoutTimer = createTimerTyped<Timer16>(5000);
     }
 }
 
@@ -261,7 +259,7 @@ void PasswordManagerTask::loadPasswordFromEEPROM()
     {
         // Initialize EEPROM with default password
         savePasswordToEEPROM();
-        logInfo(F("Initialized EEPROM with default password"));
+        logInfo(F("Initialized EEPROM with default"));
     }
 }
 

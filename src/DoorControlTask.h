@@ -29,6 +29,9 @@ private:
     uint8_t frontDoorNeedsReengage: 1; // Flag to re-engage front door magnet
     uint8_t topDoorNeedsReengage: 1;  // Flag to re-engage top door magnet
     uint8_t unauthorizedAccessActive: 1; // Flag to track if angry sound is playing
+    uint8_t frontDoorReengageLogged: 1; // Flag to prevent duplicate re-engage logging
+    uint8_t topDoorReengageLogged: 1;  // Flag to prevent duplicate re-engage logging
+    uint8_t startupDetectionComplete: 1; // Flag to track if startup state detection is complete
     static const unsigned long MAGNET_DELAY_MS = 1500; // 1.5 second delay
     static const unsigned long REENGAGE_DELAY_MS = 100; // 100ms delay for re-engagement
 
@@ -36,6 +39,7 @@ private:
     void releaseTopDoor();
     void releaseBothDoors();
     void lockAllDoors();
+    void handleStartupDoorDetection(uint8_t eventType);
     void updateStatusLEDs();
     void handleDoorSensorEvent(uint8_t eventType);
 };

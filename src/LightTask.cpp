@@ -44,7 +44,7 @@ void LightTask::on_start()
         logInfo(F("Light restored OFF from EEPROM"));
     }
 
-    logInfo(F("Task started - Pin D10, 10-bit PWM (~15.6kHz)"));
+    logInfo(F("Task started - Pin D10, 10-bit PWM"));
     logInfof(F("Saved dim level: %u%%"), savedDimLevel);
 }
 
@@ -61,11 +61,11 @@ void LightTask::on_msg(const MsgData &msg)
                     currentDimLevel = savedDimLevel;
                     setLightState(true);
                     currentState = LIGHT_ON;
-                    logInfof(F("Forced ON at %u%% brightness (MB sensor)"), currentDimLevel);
+                    logInfof(F("MB sensor: Light ON at %u%%"), currentDimLevel);
                 }
                 else
                 {
-                    logInfo(F("MB sensor ON ignored (manual override active)"));
+                    logInfo(F("MB sensor ON ignored (manual override)"));
                 }
             }
             else if (msg.arg == 0)
@@ -75,11 +75,11 @@ void LightTask::on_msg(const MsgData &msg)
                 {
                     setLightState(false);
                     currentState = LIGHT_OFF;
-                    logInfo(F("Forced OFF (MB sensor)"));
+                    logInfo(F("MB sensor: Light OFF"));
                 }
                 else
                 {
-                    logInfo(F("MB sensor OFF ignored (manual override active)"));
+                    logInfo(F("MB sensor OFF ignored (manual override)"));
                 }
             }
             else
@@ -92,14 +92,14 @@ void LightTask::on_msg(const MsgData &msg)
                     currentDimLevel = savedDimLevel;
                     setLightState(true);
                     currentState = LIGHT_ON;
-                    logInfof(F("Turned ON at %u%% brightness (manual override)"), currentDimLevel);
+                    logInfof(F("Turned %S at %u%% (manual override)"), F("ON"), currentDimLevel);
                 }
                 else
                 {
                     // Turn off
                     setLightState(false);
                     currentState = LIGHT_OFF;
-                    logInfo(F("Turned OFF (manual override)"));
+                    logInfof(F("Turned %S (manual override)"), F("OFF"));
                 }
             }
             break;
@@ -111,7 +111,7 @@ void LightTask::on_msg(const MsgData &msg)
                 currentState = LIGHT_DIMMING;
                 dimStepTimer = createTimerTyped<Timer16>(DIM_STEP_INTERVAL_MS);
                 dimIncreasing = true;
-                logInfo(F("Dimming mode started - cycling 0-100% every 1s (manual override)"));
+                logInfo(F("Dimming mode started - cycling 0-100% (manual override)"));
             }
             break;
 
@@ -123,6 +123,11 @@ void LightTask::on_msg(const MsgData &msg)
                 currentState = LIGHT_ON;
                 logInfof(F("Dimming stopped - saved level: %u%%"), savedDimLevel);
             }
+            break;
+
+        case EVT_LIGHT_RESET_OVERRIDE:
+            manualOverride = false; // Disable manual override
+            logInfo(F("Manual override reset - MB sensor control restored"));
             break;
 
         default:

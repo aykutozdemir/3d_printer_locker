@@ -8,7 +8,7 @@ void MBLightSensorTask::on_start()
 
     // Read initial state
     lastSensorState = digitalRead(MB_LIGHT_SENSOR_PIN);
-    logInfof(F("Initial state = %s"), lastSensorState ? F("HIGH") : F("LOW"));
+    logInfof(F("Initial state = %S"), lastSensorState ? F("HIGH") : F("LOW"));
 }
 
 void MBLightSensorTask::step()
@@ -35,8 +35,9 @@ void MBLightSensorTask::readMBLightSensor()
 
         // Publish the state change with inverted logic
         // HIGH = light should be OFF, LOW = light should be ON
-        publish(TOPIC_MB_LIGHT_SENSOR_EVENTS, EVT_MB_LIGHT_SENSOR_CHANGED, currentState ? 0 : 1, nullptr);
+        uint8_t lightCommand = currentState ? 0 : 1;
+        publish(TOPIC_MB_LIGHT_SENSOR_EVENTS, EVT_MB_LIGHT_SENSOR_CHANGED, lightCommand, nullptr);
 
-        logInfof(F("State changed to %s"), currentState ? F("HIGH") : F("LOW"));
+        logInfof(F("State changed to %S"), currentState ? F("HIGH") : F("LOW"));
     }
 }

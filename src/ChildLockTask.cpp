@@ -90,7 +90,7 @@ void ChildLockTask::releaseChildLock()
     logInfo(F("Released"));
 
     // Play buzzer sound for child lock release
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_CHILD_LOCK_SELECTED, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0, nullptr);
     // Update status LED to indicate child lock disabled
     publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_CHILD_UNLOCKED, 0, nullptr);
     // Start timeout countdown

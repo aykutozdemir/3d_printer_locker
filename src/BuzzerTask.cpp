@@ -7,6 +7,7 @@ BuzzerTask::BuzzerTask() : Task(F("Buzzer"))
     soundDuration = 0;
     currentFrequency = 0;
     isPlaying = false;
+    beepCount = 0;
 }
 
 void BuzzerTask::on_start()
@@ -31,52 +32,24 @@ void BuzzerTask::on_msg(const MsgData &msg)
             playButtonPress();
             break;
 
-        case EVT_BUZZER_KEYPAD_PRESS:
-            playKeypadPress();
+        case EVT_BUZZER_PASSWORD_CHANGE:
+            playPasswordChange();
             break;
 
-        case EVT_BUZZER_WRONG_PASSWORD:
-            playWrongPassword();
+        case EVT_BUZZER_PASSWORD_ACCEPT:
+            playPasswordAccept();
             break;
 
-        case EVT_BUZZER_CORRECT_PASSWORD:
-            playCorrectPassword();
+        case EVT_BUZZER_DOOR_OPEN:
+            playDoorOpen();
             break;
 
-        case EVT_BUZZER_DOOR_RELEASED:
-            playDoorReleased();
-            break;
-
-        case EVT_BUZZER_DOOR_CLOSED:
-            playDoorClosed();
+        case EVT_BUZZER_DOOR_CLOSE:
+            playDoorClose();
             break;
 
         case EVT_BUZZER_ANGRY_SOUND:
             playAngrySound();
-            break;
-
-        case EVT_BUZZER_ANGRY_SOUND_START:
-            startAngrySound();
-            break;
-
-        case EVT_BUZZER_ANGRY_SOUND_STOP:
-            stopAngrySound();
-            break;
-
-        case EVT_BUZZER_TOP_DOOR_SELECTED:
-            playTopDoorSelected();
-            break;
-
-        case EVT_BUZZER_FRONT_DOOR_SELECTED:
-            playFrontDoorSelected();
-            break;
-
-        case EVT_BUZZER_BOTH_DOORS_SELECTED:
-            playBothDoorsSelected();
-            break;
-
-        case EVT_BUZZER_CHILD_LOCK_SELECTED:
-            playChildLockSelected();
             break;
 
         default:
@@ -106,72 +79,75 @@ void BuzzerTask::step()
         }
     }
 
+    // Handle triple-beep pattern for password change
+    if (currentState == BUZZER_TRIPLE_BEEP)
+    {
+        if (beepTimer.isExpired())
+        {
+            if (beepCount < 3)
+            {
+                // Play a beep
+                tone(BUZZER_PIN, 1200, 150); // High pitch, short beep
+                beepCount++;
+
+                if (beepCount < 3)
+                {
+                    // Wait 250ms between beeps
+                    beepTimer = createTimerTyped<Timer16>(250);
+                }
+                else
+                {
+                    // All beeps done, return to idle
+                    currentState = BUZZER_IDLE;
+                }
+            }
+        }
+    }
+
     // Process any received messages
 }
 
 void BuzzerTask::playButtonPress()
 {
-    startSound(800, 100); // Short beep
+    startSound(1000, 150); // Longer, higher pitch beep for password change
     logDebug(F("Buzz btn"));
 }
 
-void BuzzerTask::playKeypadPress()
+void BuzzerTask::playPasswordAccept()
 {
-    startSound(1000, 80); // Higher pitch, shorter beep
-    logDebug(F("Buzz key"));
+    // Play accept sound for first password entry completion
+    startSound(1000, 200); // Medium pitch, medium duration
+    logInfo(F("Password accept sound"));
 }
 
-void BuzzerTask::playWrongPassword()
+void BuzzerTask::playDoorOpen()
 {
-    startSound(400, 500); // Low, long beep
-    logInfo(F("Buzz wrong"));
+    // Play door open sound for all doors
+    startSound(1000, 300); // Medium pitch, medium duration
+    logInfo(F("Door open sound"));
 }
 
-void BuzzerTask::playCorrectPassword()
+void BuzzerTask::playDoorClose()
 {
-    startSound(1200, 200); // High, medium beep
-    logInfo(F("Buzz ok"));
+    // Play door close sound for all doors
+    startSound(600, 150); // Lower pitch, shorter duration
+    logInfo(F("Door close sound"));
 }
 
-void BuzzerTask::playDoorReleased()
+void BuzzerTask::playPasswordChange()
 {
-    startSound(1000, 300); // Medium beep
-    logInfo(F("Buzz open"));
-}
-
-void BuzzerTask::playDoorClosed()
-{
-    startSound(600, 150); // Lower beep
-    logInfo(F("Buzz close"));
+    // Play a distinctive triple-beep pattern for password change mode
+    // This will be handled by the step() function with proper timing
+    currentState = BUZZER_TRIPLE_BEEP;
+    beepCount = 0;
+    beepTimer = createTimerTyped<Timer16>(200); // Start first beep immediately
+    logInfo(F("Password change sound"));
 }
 
 void BuzzerTask::playAngrySound()
 {
-    // Angry sound: low frequency, long duration
     startSound(300, 2000); // Very low, very long angry beep
     logWarn(F("Angry! unauthorized"));
-}
-
-void BuzzerTask::startAngrySound()
-{
-    // Start continuous angry sound
-    currentState = BUZZER_ANGRY_CONTINUOUS;
-    soundTimer = createTimerTyped<Timer16>(1000); // 1 second per beep
-    soundDuration = 1000; // 1 second per beep
-    currentFrequency = 300; // Low frequency
-    isPlaying = true;
-
-    tone(BUZZER_PIN, currentFrequency, soundDuration);
-    logInfo(F("Angry start"));
-}
-
-void BuzzerTask::stopAngrySound()
-{
-    // Stop continuous angry sound
-    currentState = BUZZER_IDLE;
-    isPlaying = false;
-    noTone(BUZZER_PIN);
-    logInfo(F("Angry stop"));
 }
 
 void BuzzerTask::startSound(uint16_t frequency, unsigned long duration)
@@ -191,32 +167,4 @@ void BuzzerTask::stopSound()
     currentState = BUZZER_IDLE;
     isPlaying = false;
     noTone(BUZZER_PIN); // Stop any playing tone
-}
-
-void BuzzerTask::playTopDoorSelected()
-{
-    // Two short beeps for top door
-    startSound(1000, 150);
-    logInfo(F("Top door selected sound"));
-}
-
-void BuzzerTask::playFrontDoorSelected()
-{
-    // Three short beeps for front door
-    startSound(1200, 100);
-    logInfo(F("Front door selected sound"));
-}
-
-void BuzzerTask::playBothDoorsSelected()
-{
-    // Rising tone for both doors
-    startSound(800, 200);
-    logInfo(F("Both doors selected sound"));
-}
-
-void BuzzerTask::playChildLockSelected()
-{
-    // Four short beeps for child lock
-    startSound(1500, 80);
-    logInfo(F("Child lock selected sound"));
 }

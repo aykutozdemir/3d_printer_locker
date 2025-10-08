@@ -28,6 +28,8 @@ private:
     void handleLEDCommand(const char *args);
     void handleKeypadTest();
     void handleBuzzerTest();
+    void handleResetLightOverride();
+    void handleLightStatus();
     void handleLightCommand(const char *args);
     void handleChildLockCommand(const char *args);
     void handlePasswordCommand(const char *args);

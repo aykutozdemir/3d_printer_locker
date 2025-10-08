@@ -12,6 +12,9 @@ DoorControlTask::DoorControlTask() : Task(F("DoorControl"))
     frontDoorNeedsReengage = false;
     topDoorNeedsReengage = false;
     unauthorizedAccessActive = false;
+    frontDoorReengageLogged = false;
+    topDoorReengageLogged = false;
+    startupDetectionComplete = false;
 }
 
 void DoorControlTask::on_start()
@@ -28,7 +31,7 @@ void DoorControlTask::on_start()
     lockAllDoors();
 
     logInfo(F("DoorCtl start"));
-    logInfo(F("All locked"));
+    logInfo(F("Waiting for door events"));
 }
 
 void DoorControlTask::on_msg(const MsgData &msg)
@@ -66,14 +69,22 @@ void DoorControlTask::step()
     if (frontDoorOpened && frontDoorReleased && frontDoorOpenTimer.isExpired())
     {
         digitalWrite(FRONT_DOOR_PIN, LOW); // Re-engage magnet after 1.5s delay
-        logInfo(F("Front re-engage"));
+        if (!frontDoorReengageLogged)
+        {
+            logInfo(F("Front re-engage"));
+            frontDoorReengageLogged = true;
+        }
     }
 
     // Check if top door delay has passed - now re-engage magnet (turn back to LOW)
     if (topDoorOpened && topDoorReleased && topDoorOpenTimer.isExpired())
     {
         digitalWrite(TOP_DOOR_PIN, LOW); // Re-engage magnet after 1.5s delay
-        logInfo(F("Top re-engage"));
+        if (!topDoorReengageLogged)
+        {
+            logInfo(F("Top re-engage"));
+            topDoorReengageLogged = true;
+        }
     }
 
     // Check for magnet re-engagement delays
@@ -81,14 +92,22 @@ void DoorControlTask::step()
     {
         digitalWrite(FRONT_DOOR_PIN, LOW); // Re-engage magnet
         frontDoorNeedsReengage = false;
-        logInfo(F("Front re-engage"));
+        if (!frontDoorReengageLogged)
+        {
+            logInfo(F("Front re-engage"));
+            frontDoorReengageLogged = true;
+        }
     }
 
     if (topDoorNeedsReengage && topDoorCloseTimer.isExpired())
     {
         digitalWrite(TOP_DOOR_PIN, LOW); // Re-engage magnet
         topDoorNeedsReengage = false;
-        logInfo(F("Top re-engage"));
+        if (!topDoorReengageLogged)
+        {
+            logInfo(F("Top re-engage"));
+            topDoorReengageLogged = true;
+        }
     }
 
     // Update status LEDs based on door state
@@ -102,12 +121,13 @@ void DoorControlTask::releaseFrontDoor()
     digitalWrite(FRONT_DOOR_PIN, HIGH); // Immediately turn off magnet (unlock door)
     frontDoorReleased = true;
     waitingForDoorOpen = true;
+    frontDoorReengageLogged = false; // Reset logging flag for new cycle
 
     // Set LED to "to be opened" state (green blinking)
     publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0, nullptr);
 
     // Play door released sound
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_RELEASED, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0, nullptr);
     logInfo(F("Front released"));
 }
 
@@ -116,12 +136,13 @@ void DoorControlTask::releaseTopDoor()
     digitalWrite(TOP_DOOR_PIN, HIGH); // Immediately turn off magnet (unlock door)
     topDoorReleased = true;
     waitingForDoorOpen = true;
+    topDoorReengageLogged = false; // Reset logging flag for new cycle
 
     // Set LED to "to be opened" state (green blinking)
     publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0, nullptr);
 
     // Play door released sound
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_RELEASED, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0, nullptr);
     logInfo(F("Top released"));
 }
 
@@ -132,12 +153,14 @@ void DoorControlTask::releaseBothDoors()
     frontDoorReleased = true;
     topDoorReleased = true;
     waitingForDoorOpen = true;
+    frontDoorReengageLogged = false; // Reset logging flag for new cycle
+    topDoorReengageLogged = false;  // Reset logging flag for new cycle
 
     // Set LED to "to be opened" state (green blinking)
     publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0, nullptr);
 
     // Play door released sound
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_RELEASED, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0, nullptr);
     logInfo(F("Both released"));
 }
 
@@ -150,7 +173,7 @@ void DoorControlTask::lockAllDoors()
     waitingForDoorOpen = false;
 
     // Play door closed sound
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_CLOSED, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_CLOSE, 0, nullptr);
 
     logInfo(F("All locked"));
 }
@@ -179,6 +202,13 @@ void DoorControlTask::updateStatusLEDs()
 
 void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
 {
+    // Handle startup state detection
+    if (!startupDetectionComplete)
+    {
+        handleStartupDoorDetection(eventType);
+        return;
+    }
+
     switch (eventType)
     {
         case EVT_DOOR_FRONT_OPENED:
@@ -193,7 +223,7 @@ void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
                 // Unauthorized access - door opened without password
                 logWarn(F("UNAUTH Front!"));
                 unauthorizedAccessActive = true;
-                publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND_START, 0, nullptr);
+                publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0, nullptr);
             }
             break;
 
@@ -209,7 +239,7 @@ void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
                 // Unauthorized access - door opened without password
                 logWarn(F("UNAUTH Top!"));
                 unauthorizedAccessActive = true;
-                publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND_START, 0, nullptr);
+                publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0, nullptr);
             }
             break;
 
@@ -218,7 +248,6 @@ void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
             // Stop angry sound when door is closed (only if unauthorized access was active)
             if (unauthorizedAccessActive)
             {
-                publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND_STOP, 0, nullptr);
                 unauthorizedAccessActive = false;
                 logInfo(F("Front closed"));
             }
@@ -236,7 +265,6 @@ void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
             // Stop angry sound when door is closed (only if unauthorized access was active)
             if (unauthorizedAccessActive)
             {
-                publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND_STOP, 0, nullptr);
                 unauthorizedAccessActive = false;
                 logInfo(F("Top closed"));
             }
@@ -245,17 +273,17 @@ void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
                 // Top door is closed - schedule magnet re-engagement
                 topDoorCloseTimer = createTimerTyped<Timer8>(REENGAGE_DELAY_MS); // Start timer for re-engagement
                 topDoorNeedsReengage = true; // Flag to re-engage magnet
-                logInfo(F("Top door closed"));
+                logInfo(F("Top closed"));
             }
             break;
     }
 
     // Check if all doors are closed and should be locked
-    if (!frontDoorOpened && !topDoorOpened && (frontDoorReleased || topDoorReleased))
+    if (!frontDoorOpened && !topDoorOpened)
     {
         // All doors are closed - lock all doors
         lockAllDoors();
-        logInfo(F("All closed"));
+        logInfo(F("All closed - locked"));
     }
 
     // Update LED state based on door status
@@ -265,5 +293,69 @@ void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
         waitingForDoorOpen = false;
         publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_UNLOCKED, 0, nullptr);
         logInfo(F("Door opened -> LED green"));
+    }
+}
+
+void DoorControlTask::handleStartupDoorDetection(uint8_t eventType)
+{
+    static uint8_t frontDoorStartupState = 0xFF; // Unknown state
+    static uint8_t topDoorStartupState = 0xFF;   // Unknown state
+
+    switch (eventType)
+    {
+        case EVT_DOOR_FRONT_OPENED:
+            frontDoorStartupState = 1; // Open
+            break;
+        case EVT_DOOR_FRONT_CLOSED:
+            frontDoorStartupState = 0; // Closed
+            break;
+        case EVT_DOOR_TOP_OPENED:
+            topDoorStartupState = 1; // Open
+            break;
+        case EVT_DOOR_TOP_CLOSED:
+            topDoorStartupState = 0; // Closed
+            break;
+    }
+
+    // Check if we have received at least one door state (more flexible)
+    if (frontDoorStartupState != 0xFF || topDoorStartupState != 0xFF)
+    {
+        startupDetectionComplete = true;
+
+        logInfof(F("Startup: Front=%S, Top=%S"),
+                 frontDoorStartupState ? F("OPEN") : F("CLOSED"),
+                 topDoorStartupState ? F("OPEN") : F("CLOSED"));
+
+        // If any door is open, simulate password entry and unlock
+        if (frontDoorStartupState || topDoorStartupState)
+        {
+            logInfo(F("Doors open - simulating unlock"));
+
+            // Release magnets for open doors
+            if (frontDoorStartupState)
+            {
+                releaseFrontDoor();
+            }
+            if (topDoorStartupState)
+            {
+                releaseTopDoor();
+            }
+
+            // Set door opened flags - only set to true if door is actually open
+            frontDoorOpened = (frontDoorStartupState == 1);
+            topDoorOpened = (topDoorStartupState == 1);
+
+            // Update LED to unlocked state
+            publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_UNLOCKED, 0, nullptr);
+            lastLEDState = true;
+        }
+        else
+        {
+            logInfo(F("All closed - locked"));
+            // Doors are closed, system is already in locked state
+            // Ensure door flags are set correctly
+            frontDoorOpened = false;
+            topDoorOpened = false;
+        }
     }
 }

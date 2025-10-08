@@ -1452,6 +1452,8 @@ static void logFormattedV(Scheduler::LogLevel level, const __FlashStringHelper *
 {
 #if defined(__AVR__)
     printLogHeader(level);
+    // FIXED: Use %S (capital S) for FlashStringHelper strings in AVR libc
+    // This properly handles FlashStringHelper arguments passed through va_list
     vfprintf_P(stdout, (PGM_P)format, args);
     Serial.println();
 #else

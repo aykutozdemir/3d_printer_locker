@@ -20,29 +20,25 @@ private:
     {
         BUZZER_IDLE,
         BUZZER_PLAYING,
+        BUZZER_TRIPLE_BEEP,
         BUZZER_ANGRY_CONTINUOUS
     };
 
     BuzzerState currentState;
     Timer16 soundTimer;  // 1000ms sound duration - 4 bytes
+    Timer16 beepTimer;   // Timer for triple-beep pattern - 4 bytes
     unsigned long soundDuration;
     uint16_t currentFrequency;
     uint8_t isPlaying: 1;
+    uint8_t beepCount;  // Counter for triple-beep pattern - 1 byte
 
     // Sound patterns
     void playButtonPress();
-    void playKeypadPress();
-    void playWrongPassword();
-    void playCorrectPassword();
-    void playDoorReleased();
-    void playDoorClosed();
+    void playPasswordChange();
+    void playPasswordAccept();
+    void playDoorOpen();
+    void playDoorClose();
     void playAngrySound();
-    void startAngrySound();
-    void stopAngrySound();
-    void playTopDoorSelected();
-    void playFrontDoorSelected();
-    void playBothDoorsSelected();
-    void playChildLockSelected();
 
     void startSound(uint16_t frequency, unsigned long duration);
     void stopSound();
