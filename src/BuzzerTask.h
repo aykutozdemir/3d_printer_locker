@@ -20,6 +20,7 @@ private:
     {
         BUZZER_IDLE,
         BUZZER_PLAYING,
+        BUZZER_DOUBLE_BEEP,
         BUZZER_TRIPLE_BEEP,
         BUZZER_ANGRY_CONTINUOUS
     };

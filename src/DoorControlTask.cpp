@@ -65,26 +65,20 @@ void DoorControlTask::on_msg(const MsgData &msg)
 
 void DoorControlTask::step()
 {
-    // Check if front door delay has passed - now re-engage magnet (turn back to LOW)
-    if (frontDoorOpened && frontDoorReleased && frontDoorOpenTimer.isExpired())
+    // Check if front door magnet hold has passed
+    if (frontDoorReleased && frontDoorMagnetTimer.isExpired())
     {
-        digitalWrite(FRONT_DOOR_PIN, LOW); // Re-engage magnet after 1.5s delay
-        if (!frontDoorReengageLogged)
-        {
-            logInfo(F("Front re-engage"));
-            frontDoorReengageLogged = true;
-        }
+        digitalWrite(FRONT_DOOR_PIN, LOW); // Re-engage magnet
+        frontDoorReleased = false; // Reset flag to prevent repeated execution
+        logInfo(F("Front magnet re-engaged"));
     }
 
-    // Check if top door delay has passed - now re-engage magnet (turn back to LOW)
-    if (topDoorOpened && topDoorReleased && topDoorOpenTimer.isExpired())
+    // Check if top door magnet hold has passed
+    if (topDoorReleased && topDoorMagnetTimer.isExpired())
     {
-        digitalWrite(TOP_DOOR_PIN, LOW); // Re-engage magnet after 1.5s delay
-        if (!topDoorReengageLogged)
-        {
-            logInfo(F("Top re-engage"));
-            topDoorReengageLogged = true;
-        }
+        digitalWrite(TOP_DOOR_PIN, LOW); // Re-engage magnet
+        topDoorReleased = false; // Reset flag to prevent repeated execution
+        logInfo(F("Top magnet re-engaged"));
     }
 
     // Check for magnet re-engagement delays
@@ -112,14 +106,14 @@ void DoorControlTask::step()
 
     // Update status LEDs based on door state
     updateStatusLEDs();
-
-    // Process any received messages
 }
 
 void DoorControlTask::releaseFrontDoor()
 {
-    digitalWrite(FRONT_DOOR_PIN, HIGH); // Immediately turn off magnet (unlock door)
+    // Immediate release - no delay
+    digitalWrite(FRONT_DOOR_PIN, HIGH); // Release magnet immediately
     frontDoorReleased = true;
+    frontDoorMagnetTimer = createTimerTyped<Timer16>(DOOR_MAGNET_HOLD_MS);
     waitingForDoorOpen = true;
     frontDoorReengageLogged = false; // Reset logging flag for new cycle
 
@@ -128,13 +122,15 @@ void DoorControlTask::releaseFrontDoor()
 
     // Play door released sound
     publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0);
-    logInfo(F("Front released"));
+    logInfo(F("Front door released immediately"));
 }
 
 void DoorControlTask::releaseTopDoor()
 {
-    digitalWrite(TOP_DOOR_PIN, HIGH); // Immediately turn off magnet (unlock door)
+    // Immediate release - no delay
+    digitalWrite(TOP_DOOR_PIN, HIGH); // Release magnet immediately
     topDoorReleased = true;
+    topDoorMagnetTimer = createTimerTyped<Timer16>(DOOR_MAGNET_HOLD_MS);
     waitingForDoorOpen = true;
     topDoorReengageLogged = false; // Reset logging flag for new cycle
 
@@ -143,15 +139,18 @@ void DoorControlTask::releaseTopDoor()
 
     // Play door released sound
     publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0);
-    logInfo(F("Top released"));
+    logInfo(F("Top door released immediately"));
 }
 
 void DoorControlTask::releaseBothDoors()
 {
-    digitalWrite(FRONT_DOOR_PIN, HIGH); // Immediately turn off magnet (unlock door)
-    digitalWrite(TOP_DOOR_PIN, HIGH);   // Immediately turn off magnet (unlock door)
+    // Immediate release for both doors - no delay
+    digitalWrite(FRONT_DOOR_PIN, HIGH); // Release magnet immediately
+    digitalWrite(TOP_DOOR_PIN, HIGH);   // Release magnet immediately
     frontDoorReleased = true;
     topDoorReleased = true;
+    frontDoorMagnetTimer = createTimerTyped<Timer16>(DOOR_MAGNET_HOLD_MS);
+    topDoorMagnetTimer = createTimerTyped<Timer16>(DOOR_MAGNET_HOLD_MS);
     waitingForDoorOpen = true;
     frontDoorReengageLogged = false; // Reset logging flag for new cycle
     topDoorReengageLogged = false;  // Reset logging flag for new cycle
@@ -161,7 +160,7 @@ void DoorControlTask::releaseBothDoors()
 
     // Play door released sound
     publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0);
-    logInfo(F("Both released"));
+    logInfo(F("Both doors released immediately"));
 }
 
 void DoorControlTask::lockAllDoors()
@@ -213,7 +212,7 @@ void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
     {
         case EVT_DOOR_FRONT_OPENED:
             frontDoorOpened = true;
-            frontDoorOpenTimer = createTimerTyped<Timer16>(MAGNET_DELAY_MS); // Start timer for re-engagement
+            frontDoorMagnetTimer = createTimerTyped<Timer16>(DOOR_MAGNET_HOLD_MS); // Start timer for re-engagement
             if (frontDoorReleased)
             {
                 logInfo(F("Front opened"));
@@ -229,7 +228,7 @@ void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
 
         case EVT_DOOR_TOP_OPENED:
             topDoorOpened = true;
-            topDoorOpenTimer = createTimerTyped<Timer16>(MAGNET_DELAY_MS); // Start timer for re-engagement
+            topDoorMagnetTimer = createTimerTyped<Timer16>(DOOR_MAGNET_HOLD_MS); // Start timer for re-engagement
             if (topDoorReleased)
             {
                 logInfo(F("Top opened"));
@@ -359,3 +358,5 @@ void DoorControlTask::handleStartupDoorDetection(uint8_t eventType)
         }
     }
 }
+
+// New delay-based door opening functions

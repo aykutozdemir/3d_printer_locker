@@ -15,6 +15,8 @@ void PasswordManagerTask::on_start()
     subscribe(TOPIC_KEYPAD_EVENTS);
     // Listen to yellow button short press for password change trigger
     subscribe(TOPIC_BUTTON_EVENTS);
+    // Listen to door sensor events for session management
+    subscribe(TOPIC_DOOR_SENSOR_EVENTS);
 
     logInfo(F("Task started - 4-digit password"));
     // Load password from EEPROM if initialized
@@ -42,8 +44,25 @@ void PasswordManagerTask::on_msg(const MsgData &msg)
         case EVT_KEYPAD_3_PRESSED:
         case EVT_KEYPAD_4_PRESSED:
             logInfo(F("Keypad event received"));
-            if (currentState == PASSWORD_IDLE || currentState == PASSWORD_ENTERING ||
-                    currentState == PASSWORD_CHANGE_ENTER || currentState == PASSWORD_CHANGE_CONFIRM)
+            if (currentState == PASSWORD_DOOR_SESSION_ACTIVE || currentState == PASSWORD_SCREEN_SESSION_ACTIVE)
+            {
+                // Handle direct door selection during active session
+                uint8_t digit = msg.type - 9;
+
+                // Special handling for +4 during screen session
+                if (digit == 4 && currentState == PASSWORD_SCREEN_SESSION_ACTIVE)
+                {
+                    logInfo(F("Key4 -> extend screen timeout"));
+                    screenTimeoutTimer = createTimerTyped<Timer16>(SCREEN_TIMEOUT_MS);
+                    logInfo(F("Screen timeout extended by 1 minute"));
+                }
+                else
+                {
+                    handleDoorSelection(digit);
+                }
+            }
+            else if (currentState == PASSWORD_IDLE || currentState == PASSWORD_ENTERING ||
+                     currentState == PASSWORD_CHANGE_ENTER || currentState == PASSWORD_CHANGE_CONFIRM)
             {
                 // Convert event type to digit (10->1, 11->2, 12->3, 13->4)
                 uint8_t digit = msg.type - 9;
@@ -110,6 +129,24 @@ void PasswordManagerTask::on_msg(const MsgData &msg)
             }
             break;
 
+        case EVT_KEYPAD_1_LONG_PRESSED:
+            if (currentState == PASSWORD_SCREEN_SESSION_ACTIVE)
+            {
+                logInfo(F("Key1 long -> lock screen"));
+                publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_ENGAGE, 0);
+                resetPassword();
+            }
+            break;
+
+        case EVT_DOOR_FRONT_CLOSED:
+        case EVT_DOOR_TOP_CLOSED:
+            if (currentState == PASSWORD_DOOR_SESSION_ACTIVE)
+            {
+                logInfo(F("Door closed -> ending door session"));
+                resetPassword();
+            }
+            break;
+
         default:
             break;
     }
@@ -128,13 +165,21 @@ void PasswordManagerTask::step()
     }
     else if (currentState == PASSWORD_WAITING_DOOR_SELECTION)
     {
-        if (digitTimeoutTimer.isExpired())
+        if (selectionTimeoutTimer.isExpired())
         {
-            logWarn(F("Timeout - no option selected"));
+            logWarn(F("Selection timeout - no option selected"));
             resetPassword();
         }
     }
-
+    else if (currentState == PASSWORD_SCREEN_SESSION_ACTIVE)
+    {
+        if (screenTimeoutTimer.isExpired())
+        {
+            logWarn(F("Screen timeout - locking screen"));
+            publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_ENGAGE, 0);
+            resetPassword();
+        }
+    }
 }
 
 void PasswordManagerTask::resetPassword()
@@ -163,7 +208,7 @@ void PasswordManagerTask::checkPassword()
 
         // Wait for door selection
         currentState = PASSWORD_WAITING_DOOR_SELECTION;
-        digitTimeoutTimer = createTimerTyped<Timer16>(PASSWORD_DIGIT_TIMEOUT_MS); // Reset timeout for door selection
+        selectionTimeoutTimer = createTimerTyped<Timer16>(PASSWORD_SELECTION_TIMEOUT_MS); // 5 seconds for selection
     }
     else
     {
@@ -202,23 +247,29 @@ void PasswordManagerTask::handleDoorSelection(uint8_t digit)
             break;
 
         case 4:
-            logInfo(F("Releasing CHILD LOCK"));
+            logInfo(F("Activating SCREEN/POWER BUTTON"));
             publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_RELEASE, 0);
-            break;
-
-        default:
-            logWarn(F("Invalid door selection"));
-            break;
+            // Start screen session
+            currentState = PASSWORD_SCREEN_SESSION_ACTIVE;
+            screenTimeoutTimer = createTimerTyped<Timer16>(SCREEN_TIMEOUT_MS);
+            logInfo(F("Screen session active - 1 minute timeout"));
+            return; // Don't reset password for screen session
     }
 
-    // Reset after door selection
-    resetPassword();
+    // For door selections (1,2,3), start door session
+    if (digit >= 1 && digit <= 3)
+    {
+        currentState = PASSWORD_DOOR_SESSION_ACTIVE;
+        logInfo(F("Door session active - until doors closed"));
+    }
 }
 
 void PasswordManagerTask::handleYellowShortPress()
 {
-    // Only allow entering change mode right after a correct password
-    if (currentState == PASSWORD_WAITING_DOOR_SELECTION)
+    // Allow entering change mode right after a correct password or during active session
+    if (currentState == PASSWORD_WAITING_DOOR_SELECTION ||
+            currentState == PASSWORD_DOOR_SESSION_ACTIVE ||
+            currentState == PASSWORD_SCREEN_SESSION_ACTIVE)
     {
         logInfo(F("Password change mode initiated"));
         currentState = PASSWORD_CHANGE_ENTER;

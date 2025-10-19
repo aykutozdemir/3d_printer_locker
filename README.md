@@ -124,7 +124,7 @@ This project uses **FsmOS**, a custom cooperative task scheduler optimized for A
 | LED Strip MOSFET (PWM)   | **D10**  | Hardware PWM                |
 | Front Solenoid MOSFET    | **D11**  | Digital                     |
 | Top Solenoid MOSFET      | **D12**  | Digital                     |
-| Child‑Lock: Power Button | **D13**  | Digital (or via NPN driver) |
+| Child‑Lock: Power Button | **A5**   | Digital (or via NPN driver) |
 | Child‑Lock: Touchscreen  | **A0**   | Digital (or via NPN driver) |
 | Status LED (Red)         | **A1**   | With series resistor        |
 | Status LED (Green)       | **A2**   | With series resistor        |
@@ -157,23 +157,33 @@ This project uses **FsmOS**, a custom cooperative task scheduler optimized for A
   * Input OFF → LED OFF
 * Pressing Yellow (toggle or dim) enables **manual override**, during which motherboard input is ignored until the next power cycle or explicit toggle from Yellow.
 
-### 3.3 Keypad: Password + Options
+### 3.3 Keypad: Password + Session Management
 
 * Passwords are **always 4 digits**
 * **Factory default password: `1234`**
 * **Digit timeout**: 3 s between key presses (resets the entry if exceeded)
+* **Selection timeout**: 5 s to select option after correct password
 * After entering 4 digits:
 
-  * **Correct** → *accept beep* and wait for **option**
+  * **Correct** → *accept beep* and wait for **option** (5 seconds)
   * **Incorrect** → *error beep*, reset
 
 **Options after correct password**
 
-* `+1` → **Top door unlock** (solenoid ~5 s)
-* `+2` → **Front door unlock** (solenoid ~5 s)
-* `+3` → **Both doors unlock**
-* `+4` → **Child‑lock disable** (starts a 1-minute timeout)
+* `+1` → **Top door unlock** (immediate + 5s magnet hold)
+* `+2` → **Front door unlock** (immediate + 5s magnet hold)
+* `+3` → **Both doors unlock** (immediate + 5s magnet hold)
+* `+4` → **Screen/Power button unlock** (1 minute timeout)
 * **Short press Yellow Button** → **Password change mode**
+
+**Session Management**
+
+* **Door Session**: Active while any door is open - can select new doors until all closed
+* **Screen Session**: Active for 1 minute after +4 selection - can extend with +4 or lock with +1 long press
+* **Session Features**:
+  * During door session: Can select doors (1,2,3) without re-entering password
+  * During screen session: Can select doors (1,2,3) or extend timeout (+4) or lock (+1 long)
+  * Session ends when doors closed or screen timeout expires
 
 **Password Change Mode (Yellow Button)**
 
@@ -181,11 +191,12 @@ This project uses **FsmOS**, a custom cooperative task scheduler optimized for A
 * Match → store in EEPROM, confirmation beep
 * Mismatch → error beep, old password kept
 
-**Child Lock Disabled Mode**
+**Screen Session Controls**
 
-* When child lock is disabled, the keypad has special functions:
-    * `1 (long press)` → **Re‑engage child lock immediately**.
-    * `4 (short press)` → **Reset the 1‑minute timeout**.
+* When screen is unlocked (+4), special keypad functions:
+    * `1 (long press)` → **Lock screen immediately**
+    * `4 (short press)` → **Extend timeout by 1 minute**
+    * `1,2,3 (short press)` → **Open doors** (if session active)
 
 ### 3.4 Auto‑Locking
 
@@ -233,12 +244,14 @@ This project uses **FsmOS**, a custom cooperative task scheduler optimized for A
 
 | Event                       | Value       | Notes                         |
 | --------------------------- | ----------- | ----------------------------- |
-| Magnet re‑engage (after open) | **~1.5 s** | Hold‑off before re‑engage     |
+| Door opening delay          | **Immediate** | Doors open immediately when selected |
+| Magnet hold after opening   | **5 s**     | Hold magnet released after opening |
 | Magnet re‑engage (after close) | **~100 ms** | Re‑engage after closure      |
 | Keypad digit timeout        | **3 s**     | Between digits                |
+| Password selection timeout  | **5 s**     | Time to select option after correct password |
+| Screen session timeout      | **1 min**   | Screen/power button active time |
 | Yellow long‑press threshold | **~1 s**    | Start brightness stepping     |
 | Brightness step             | **10% / s** | Ping‑pong 0↔100%              |
-| Child lock timeout          | **1 min**   | Auto-enables child lock       |
 
 ---
 
@@ -269,14 +282,15 @@ This project uses **FsmOS**, a custom cooperative task scheduler optimized for A
 | `help`                   | Show available commands |
 | `status`                 | Show system status summary |
 | `led <state>`            | Control LEDs: `locked`, `unlocked`, `to_be_locked` |
-| `ledstate <name>`        | Set LED state: `locked`, `unlocked`, `to_be_locked`, `to_be_opened`, `child_unlocked` |
 | `light <on|off|toggle>`  | Control internal light |
-| `childlock <engage|release|status|reset>` | Engage/release, show status, or reset 1‑min timeout |
-| `password <show|reload|set 1234>` | PIN ops; `reload` re‑reads EEPROM; use keypad to change PIN |
+| `childlock <engage|release|status>` | Engage/release child lock or show status |
+| `password <show|reload|factory>` | PIN operations; `reload` re‑reads EEPROM; use keypad to change PIN |
 | `factoryreset`           | Reset EEPROM to defaults (dangerous) |
 | `mem`                    | Memory usage information |
-| `tl`                     | Task limit check |
 | `s`                      | System statistics |
+| `sensors`                | Show sensor status |
+| `test`                   | Test keypad functionality |
+| `buzzer`                 | Test buzzer functionality |
 
 ---
 
@@ -360,8 +374,9 @@ This project uses **FsmOS**, a custom cooperative task scheduler optimized for A
 ## 12) Versioning & Defaults
 
 * Default password: **1234**
-* Default timings: **5 s unlock**, **10 s auto‑lock**, **3 s keypad timeout**, **10%/s dim step**
-* Factory reset: **Hold Yellow ≥5 s on power‑up**
+* Default timings: **5 s door opening delay**, **3 s magnet hold**, **3 s keypad timeout**, **5 s selection timeout**, **1 min screen timeout**
+* Session management: **Door-based** (until closed) and **Screen-based** (1 minute with extension)
+* Factory reset: **Serial command `factoryreset`**
 
 ---
 

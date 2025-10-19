@@ -79,6 +79,31 @@ void BuzzerTask::step()
         }
     }
 
+    // Handle double-beep pattern for password accept
+    if (currentState == BUZZER_DOUBLE_BEEP)
+    {
+        if (beepTimer.isExpired())
+        {
+            if (beepCount < 2)
+            {
+                // Play a beep
+                tone(BUZZER_PIN, 1200, 150); // High pitch, short beep
+                beepCount++;
+
+                if (beepCount < 2)
+                {
+                    // Wait 200ms between beeps
+                    beepTimer = createTimerTyped<Timer16>(200);
+                }
+                else
+                {
+                    // All beeps done, return to idle
+                    currentState = BUZZER_IDLE;
+                }
+            }
+        }
+    }
+
     // Handle triple-beep pattern for password change
     if (currentState == BUZZER_TRIPLE_BEEP)
     {
@@ -115,9 +140,11 @@ void BuzzerTask::playButtonPress()
 
 void BuzzerTask::playPasswordAccept()
 {
-    // Play accept sound for first password entry completion
-    startSound(1000, 200); // Medium pitch, medium duration
-    logInfo(F("Password accept"));
+    // Play distinctive double-beep for correct password
+    currentState = BUZZER_DOUBLE_BEEP;
+    beepCount = 0;
+    beepTimer = createTimerTyped<Timer16>(200); // Start first beep immediately
+    logInfo(F("Password accept - double beep"));
 }
 
 void BuzzerTask::playDoorOpen()
@@ -146,7 +173,7 @@ void BuzzerTask::playPasswordChange()
 
 void BuzzerTask::playAngrySound()
 {
-    startSound(300, 2000); // Very low, very long angry beep
+    startSound(300, 800); // Low pitch, shorter duration (was 2000ms)
     logWarn(F("Angry! unauthorized"));
 }
 

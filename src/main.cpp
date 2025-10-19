@@ -83,20 +83,25 @@ void initializeCompleteScheduler()
     yellowButtonTask.setPeriod(10);                  // 10ms - High frequency button scanning
 
     // Add tasks to scheduler - ALL TASKS ACTIVE
-    OS.add(&buzzerTask);
-    OS.add(&childLockTask);
-    OS.add(&deviceRunningSensorTask);
-    OS.add(&diagnosticTask);
-    OS.add(&doorControlTask);
-    OS.add(&doorSensorTask);
-    OS.add(&eventHandlerTask);
-    OS.add(&keypadTask);
-    OS.add(&lightTask);
-    OS.add(&mbLightSensorTask);
-    OS.add(&passwordManagerTask);
-    OS.add(&serialCommandTask);
-    OS.add(&statusLEDTask);
-    OS.add(&yellowButtonTask);
+    Serial.println(F("Adding tasks..."));
+    bool success = true;
+    success &= OS.add(&buzzerTask); Serial.print(F("Buzzer: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&childLockTask); Serial.print(F("ChildLock: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&deviceRunningSensorTask); Serial.print(F("DeviceRunning: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&diagnosticTask); Serial.print(F("Diagnostic: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&doorControlTask); Serial.print(F("DoorControl: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&doorSensorTask); Serial.print(F("DoorSensor: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&eventHandlerTask); Serial.print(F("EventHandler: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&keypadTask); Serial.print(F("Keypad: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&lightTask); Serial.print(F("Light: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&mbLightSensorTask); Serial.print(F("MBLightSensor: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&passwordManagerTask); Serial.print(F("PasswordManager: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&serialCommandTask); Serial.print(F("SerialCommand: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&statusLEDTask); Serial.print(F("StatusLED: ")); Serial.println(success ? F("OK") : F("FAIL"));
+    success &= OS.add(&yellowButtonTask); Serial.print(F("YellowButton: ")); Serial.println(success ? F("OK") : F("FAIL"));
+
+    Serial.print(F("All tasks added: "));
+    Serial.println(success ? F("SUCCESS") : F("SOME FAILED"));
 
     Serial.println(F("Scheduler OK"));
     Serial.print(F("Tasks: "));
@@ -111,7 +116,7 @@ void displaySystemInfo()
     Serial.println();
     Serial.println(F("=== 3D PRINTER LOCKER ==="));
     Serial.println(F("HW: Nano"));
-    Serial.println(F("FW: FsmOS"));
+    Serial.println(F("FW: FsmOS v1.3.0"));
     Serial.print(F("Build: "));
     Serial.print(F(__DATE__));
     Serial.print(F(" "));
@@ -164,18 +169,6 @@ void displaySystemInfo()
             Serial.println(F("Other"));
             break;
     }
-
-    Serial.println(F("=== Features ==="));
-    Serial.println(F("- PIN access"));
-    Serial.println(F("- Child lock"));
-    Serial.println(F("- Door ctl"));
-    Serial.println(F("- Light dim"));
-    Serial.println(F("- Status LEDs"));
-    Serial.println(F("- Buzzer"));
-    Serial.println(F("- Serial CLI"));
-    Serial.println(F("- Diag"));
-    Serial.println(F("- Static alloc"));
-    Serial.println();
 }
 
 /**

@@ -30,7 +30,7 @@
 #define TOP_DOOR_PIN 12    // D12
 
 // Child lock control pin definitions
-#define CHILD_LOCK_POWER_PIN 13  // D13 - Power button lock
+#define CHILD_LOCK_POWER_PIN A5  // A5 - Power button lock
 #define CHILD_LOCK_SCREEN_PIN A0 // A0 - Touchscreen lock
 
 // Door sensor pin definitions
@@ -114,8 +114,14 @@
 
 // Password timing constants
 #define PASSWORD_DIGIT_TIMEOUT_MS 3000  // 3 seconds per digit
+#define PASSWORD_SELECTION_TIMEOUT_MS 5000  // 5 seconds for door selection
+#define PASSWORD_SESSION_TIMEOUT_MS 120000  // 2 minutes session timeout (deprecated - now door-based)
 #define PASSWORD_LENGTH 4
 #define DEFAULT_PASSWORD "1234"
+
+// Door control timing
+#define DOOR_MAGNET_HOLD_MS 5000   // 5 seconds magnet hold after opening
+#define SCREEN_TIMEOUT_MS 60000    // 1 minute screen/power button timeout
 
 // Child lock timing
 #define CHILD_LOCK_TIMEOUT_MS 60000  // 1 minute auto re-engage

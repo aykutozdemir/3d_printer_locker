@@ -22,8 +22,10 @@ private:
     uint8_t topDoorOpened: 1;  // Track if top door is physically opened
     uint8_t waitingForDoorOpen: 1; // Track if we're waiting for door to be opened
     uint8_t lastLEDState: 1; // Track last LED state to avoid duplicate messages
-    Timer16 frontDoorOpenTimer; // 1500ms magnet delay - 4 bytes
-    Timer16 topDoorOpenTimer;   // 1500ms magnet delay - 4 bytes
+    Timer16 frontDoorOpeningTimer; // 5000ms opening delay - 4 bytes
+    Timer16 topDoorOpeningTimer;   // 5000ms opening delay - 4 bytes
+    Timer16 frontDoorMagnetTimer; // 3000ms magnet hold - 4 bytes
+    Timer16 topDoorMagnetTimer;   // 3000ms magnet hold - 4 bytes
     Timer8 frontDoorCloseTimer; // 100ms reengage delay - 2 bytes
     Timer8 topDoorCloseTimer;   // 100ms reengage delay - 2 bytes
     uint8_t frontDoorNeedsReengage: 1; // Flag to re-engage front door magnet

@@ -3,6 +3,65 @@
 #include <avr/eeprom.h>
 #include <ctype.h>
 
+// Memory utility functions
+int freeMemory()
+{
+    // Simple stack pointer method
+    extern char __heap_start, *__brkval;
+    int v;
+    return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
+
+uint16_t getProgramSize()
+{
+    // This is a rough estimate - actual program size varies
+    return 29800; // Current approximate size from compilation
+}
+
+uint16_t getActualEEPROMUsage()
+{
+    uint16_t used = 0;
+
+    // Check if light brightness is set (address 0)
+    uint8_t brightness = eeprom_read_byte((uint8_t *)0);
+    if (brightness != 0xFF)
+    {
+        used++;    // 0xFF means uninitialized
+    }
+
+    // Check if light state is set (address 1)
+    uint8_t lightState = eeprom_read_byte((uint8_t *)EEPROM_LIGHT_STATE_ADDR);
+    if (lightState != 0xFF)
+    {
+        used++;
+    }
+
+    // Check if password magic is set (address 16)
+    uint8_t magic = eeprom_read_byte((uint8_t *)EEPROM_PASSWORD_MAGIC_ADDR);
+    if (magic == EEPROM_PASSWORD_MAGIC_VAL)
+    {
+        used++;
+    }
+
+    // Check if password is set (address 17-20)
+    bool passwordSet = false;
+    for (uint8_t i = 0; i < PASSWORD_LENGTH; i++)
+    {
+        uint8_t pwdByte = eeprom_read_byte((uint8_t *)(EEPROM_PASSWORD_ADDR + i));
+        if (pwdByte != 0xFF && pwdByte >= '0' && pwdByte <= '9')
+        {
+            passwordSet = true;
+            break;
+        }
+    }
+    if (passwordSet)
+    {
+        used += PASSWORD_LENGTH;
+    }
+
+    return used;
+}
+
 // Case-insensitive compare: RAM string vs PROGMEM string
 static bool equalsIgnoreCase_P(const char *ram, PGM_P rom)
 {
@@ -133,10 +192,6 @@ void SerialCommandTask::processCommand(const char *command)
     {
         handlePasswordCommand(command + 9);
     }
-    else if (startsWithIgnoreCase_P(command, PSTR("ledstate ")))
-    {
-        handleLEDStateCommand(command + 9);
-    }
     else if (equalsIgnoreCase_P(command, PSTR("factoryreset")))
     {
         handleFactoryResetCommand();
@@ -157,10 +212,6 @@ void SerialCommandTask::processCommand(const char *command)
     {
         handleBuzzerTest();
     }
-    else if (equalsIgnoreCase_P(command, PSTR("clear")) || equalsIgnoreCase_P(command, PSTR("c")))
-    {
-        Serial.println(F("\033[2J\033[H")); // ANSI clear screen
-    }
     else if (equalsIgnoreCase_P(command, PSTR("resetlight")) || equalsIgnoreCase_P(command, PSTR("rl")))
     {
         handleResetLightOverride();
@@ -168,10 +219,6 @@ void SerialCommandTask::processCommand(const char *command)
     else if (equalsIgnoreCase_P(command, PSTR("lightstatus")) || equalsIgnoreCase_P(command, PSTR("ls")))
     {
         handleLightStatus();
-    }
-    else if (equalsIgnoreCase_P(command, PSTR("tasklimit")) || equalsIgnoreCase_P(command, PSTR("tl")))
-    {
-        handleTaskLimitCheck();
     }
     else
     {
@@ -181,21 +228,35 @@ void SerialCommandTask::processCommand(const char *command)
 
 void SerialCommandTask::printHelp()
 {
-    Serial.println(F("=== Commands ==="));
-    Serial.println(F("h-help s-stats r-reset u-uptime"));
-    Serial.println(F("st-status led-ledstate light childlock"));
-    Serial.println(F("password factoryreset sensors mem"));
-    Serial.println(F("t-test b-buzzer c-clear rl-resetlight"));
-    Serial.println(F("ls-lightstatus tl-tasklimit"));
+    Serial.println(F("=== SERIAL COMMANDS ==="));
     Serial.println(F(""));
-    Serial.println(F("=== LED States ==="));
-    Serial.println(F("led locked/unlocked/to_be_locked"));
+    Serial.println(F("System Information:"));
+    Serial.println(F("  h, help     - Show this help"));
+    Serial.println(F("  s, stats    - Show task statistics"));
+    Serial.println(F("  r, reset    - Show reset information"));
+    Serial.println(F("  u, uptime   - Show system uptime"));
+    Serial.println(F("  st, status  - Show system status"));
+    Serial.println(F("  mem, memory - Show memory usage and task RAM usage"));
     Serial.println(F(""));
-    Serial.println(F("=== Light Commands ==="));
-    Serial.println(F("light on/off/toggle"));
+    Serial.println(F("Hardware Control:"));
+    Serial.println(F("  led <state> - Control status LED"));
+    Serial.println(F("    locked, unlocked, to_be_locked"));
+    Serial.println(F("  light <cmd> - Control internal light"));
+    Serial.println(F("    on, off, toggle"));
+    Serial.println(F("  childlock <cmd> - Control child lock"));
+    Serial.println(F("    engage, release, status"));
     Serial.println(F(""));
-    Serial.println(F("=== Child Lock Commands ==="));
-    Serial.println(F("childlock engage/release/status"));
+    Serial.println(F("Testing & Maintenance:"));
+    Serial.println(F("  t, test     - Test keypad"));
+    Serial.println(F("  b, buzzer   - Test buzzer"));
+    Serial.println(F("  sensors     - Show sensor status"));
+    Serial.println(F("  password    - Password management"));
+    Serial.println(F(""));
+    Serial.println(F("System Management:"));
+    Serial.println(F("  factoryreset - Reset to factory defaults"));
+    Serial.println(F("  rl, resetlight - Reset light override"));
+    Serial.println(F("  ls, lightstatus - Show light status"));
+    Serial.println(F(""));
 }
 
 void SerialCommandTask::printTaskStats()
@@ -205,7 +266,7 @@ void SerialCommandTask::printTaskStats()
     Serial.print(F("Tasks: "));
     Serial.println(taskCount);
 
-    for (uint8_t i = 0; i < taskCount; i++)
+    for (uint8_t i = 1; i <= taskCount; i++)  // Task IDs start from 1, not 0
     {
         TaskStats stats;
         if (OS.getTaskStats(i, stats))
@@ -267,26 +328,15 @@ void SerialCommandTask::printSystemStatus()
     Serial.println(F("=== Status ==="));
     Serial.println(F("3D Printer Locker System"));
     Serial.println(F("Hardware:"));
-    Serial.print(F("  Yellow Button: D"));
-    Serial.println(YELLOW_BUTTON_PIN);
-    Serial.print(F("  Keypad: D"));
-    Serial.print(KEYPAD_PIN_1);
-    Serial.print(F(", D"));
-    Serial.print(KEYPAD_PIN_2);
-    Serial.print(F(", D"));
-    Serial.print(KEYPAD_PIN_3);
-    Serial.print(F(", D"));
-    Serial.println(KEYPAD_PIN_4);
-    Serial.println(F("  Red LED: A1"));
-    Serial.println(F("  Green LED: A2"));
-    Serial.print(F("  Light Control: D"));
-    Serial.println(LIGHT_PIN);
-    Serial.print(F("  MB Light Sensor: D"));
-    Serial.println(MB_LIGHT_SENSOR_PIN);
-    Serial.println(F("  Device Running Sensor: A4"));
-    Serial.print(F("  Child Lock Power: D"));
-    Serial.println(CHILD_LOCK_POWER_PIN);
-    Serial.println(F("  Child Lock Screen: A0"));
+    Serial.println(F("  Yellow Button: Active"));
+    Serial.println(F("  Keypad: 4-digit membrane"));
+    Serial.println(F("  Red LED: Status indicator"));
+    Serial.println(F("  Green LED: Status indicator"));
+    Serial.println(F("  Light Control: PWM controlled"));
+    Serial.println(F("  MB Light Sensor: Active"));
+    Serial.println(F("  Device Running Sensor: Active"));
+    Serial.println(F("  Child Lock Power: Active"));
+    Serial.println(F("  Child Lock Screen: Active"));
     Serial.println(F("Features: Watchdog, Reset tracking, Task monitoring, Smart child lock"));
 }
 
@@ -296,17 +346,17 @@ void SerialCommandTask::handleLEDCommand(const char *args)
     {
         args++;
     }
-    if (strcasecmp(args, "locked") == 0)
+    if (strcasecmp_P(args, PSTR("locked")) == 0)
     {
         logInfo(F("LED LOCKED"));
         publish(EVT_LED_LOCKED, 0, 0);
     }
-    else if (strcasecmp(args, "unlocked") == 0)
+    else if (strcasecmp_P(args, PSTR("unlocked")) == 0)
     {
         logInfo(F("LED UNLOCKED"));
         publish(EVT_LED_UNLOCKED, 0, 0);
     }
-    else if (strcasecmp(args, "to_be_locked") == 0)
+    else if (strcasecmp_P(args, PSTR("to_be_locked")) == 0)
     {
         logInfo(F("LED TO_BE_LOCKED"));
         publish(EVT_LED_TO_BE_LOCKED, 0, 0);
@@ -375,17 +425,17 @@ void SerialCommandTask::handleLightCommand(const char *args)
     {
         args++;
     }
-    if (strcasecmp(args, "on") == 0)
+    if (strcasecmp_P(args, PSTR("on")) == 0)
     {
         logInfof(F("Light %S"), F("ON"));
         publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_TOGGLE, 1);
     }
-    else if (strcasecmp(args, "off") == 0)
+    else if (strcasecmp_P(args, PSTR("off")) == 0)
     {
         logInfof(F("Light %S"), F("OFF"));
         publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_TOGGLE, 0);
     }
-    else if (strcasecmp(args, "toggle") == 0)
+    else if (strcasecmp_P(args, PSTR("toggle")) == 0)
     {
         logInfo(F("Toggling light"));
         publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_TOGGLE, 2);
@@ -402,22 +452,22 @@ void SerialCommandTask::handleChildLockCommand(const char *args)
     {
         args++;
     }
-    if (strcasecmp(args, "engage") == 0)
+    if (strcasecmp_P(args, PSTR("engage")) == 0)
     {
         logInfo(F("Engaging child lock"));
         publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_ENGAGE, 0);
     }
-    else if (strcasecmp(args, "release") == 0)
+    else if (strcasecmp_P(args, PSTR("release")) == 0)
     {
         logInfo(F("Releasing child lock"));
         publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_RELEASE, 0);
     }
-    else if (strcasecmp(args, "reset") == 0)
+    else if (strcasecmp_P(args, PSTR("reset")) == 0)
     {
         logInfo(F("Resetting child lock timeout"));
         publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_TIMEOUT_RESET, 0);
     }
-    else if (strcasecmp(args, "status") == 0)
+    else if (strcasecmp_P(args, PSTR("status")) == 0)
     {
         Serial.println(F("Child lock status:"));
         Serial.println(F("  - Automatically managed based on device running state"));
@@ -435,11 +485,11 @@ void SerialCommandTask::handlePasswordCommand(const char *args)
     {
         args++;
     }
-    if (strcasecmp(args, "show") == 0)
+    if (strcasecmp_P(args, PSTR("show")) == 0)
     {
         Serial.println(F("Password cannot be shown for security. Use 'password reload' or keypad change mode."));
     }
-    else if (strcasecmp(args, "reload") == 0)
+    else if (strcasecmp_P(args, PSTR("reload")) == 0)
     {
         logInfo(F("Requesting password reload from EEPROM"));
         publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_RELOAD_REQUEST, 0);
@@ -496,38 +546,6 @@ void SerialCommandTask::handlePasswordCommand(const char *args)
     }
 }
 
-void SerialCommandTask::handleLEDStateCommand(const char *args)
-{
-    while (*args == ' ')
-    {
-        args++;
-    }
-    if (strcasecmp(args, "locked") == 0)
-    {
-        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_LOCKED, 0);
-    }
-    else if (strcasecmp(args, "unlocked") == 0)
-    {
-        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_UNLOCKED, 0);
-    }
-    else if (strcasecmp(args, "to_be_locked") == 0)
-    {
-        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_LOCKED, 0);
-    }
-    else if (strcasecmp(args, "to_be_opened") == 0)
-    {
-        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0);
-    }
-    else if (strcasecmp(args, "child_unlocked") == 0)
-    {
-        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_CHILD_UNLOCKED, 0);
-    }
-    else
-    {
-        Serial.println(F("Invalid ledstate. Use: locked/unlocked/to_be_locked/to_be_opened/child_unlocked"));
-    }
-}
-
 void SerialCommandTask::handleFactoryResetCommand()
 {
     Serial.println(F("=== FACTORY RESET ==="));
@@ -558,12 +576,10 @@ void SerialCommandTask::handleSensorStatus()
     bool mbLightSensor = digitalRead(MB_LIGHT_SENSOR_PIN);
     bool deviceRunning = digitalRead(DEVICE_RUNNING_SENSOR_PIN);
 
-    Serial.print(F("Motherboard Light Sensor (D"));
-    Serial.print(MB_LIGHT_SENSOR_PIN);
-    Serial.print(F("): "));
+    Serial.print(F("Motherboard Light Sensor: "));
     Serial.println(mbLightSensor ? F("HIGH") : F("LOW"));
 
-    Serial.print(F("Device Running Sensor (A4): "));
+    Serial.print(F("Device Running Sensor: "));
     Serial.println(deviceRunning ? F("RUNNING") : F("STOPPED"));
 
     Serial.println(F(""));
@@ -580,159 +596,163 @@ void SerialCommandTask::handleSensorStatus()
 
 void SerialCommandTask::handleMemoryInfo()
 {
-    Serial.println(F("=== Memory ==="));
+    Serial.println(F("=== Memory Info ==="));
 
-    // Get system memory info
-    SystemMemoryInfo sys_info;
-    if (OS.getSystemMemoryInfo(sys_info))
+    // Basic RAM info using Arduino functions
+    Serial.println(F("\nRAM Usage:"));
+    Serial.print(F("  Free RAM: "));
+    Serial.print(freeMemory());
+    Serial.println(F(" bytes"));
+
+    // Calculate used RAM (approximate)
+    uint16_t free_ram = freeMemory();
+    uint16_t total_ram = 2048; // Arduino Nano has 2KB RAM
+    uint16_t used_ram = total_ram - free_ram;
+
+    Serial.print(F("  Used RAM: "));
+    Serial.print(used_ram);
+    Serial.println(F(" bytes"));
+
+    Serial.print(F("  Total RAM: "));
+    Serial.print(total_ram);
+    Serial.println(F(" bytes"));
+
+    Serial.print(F("  Usage: "));
+    Serial.print((uint32_t)used_ram * 100UL / (uint32_t)total_ram);
+    Serial.println(F("%"));
+
+    // Heap allocation info using FsmOS memory leak detection
+    MemoryStats leak_stats;
+    if (OS.getMemoryLeakStats(leak_stats))
     {
-        // RAM Usage
-        Serial.println(F("\nRAM:"));
-        Serial.print(F("  Total: "));
-        Serial.print(sys_info.totalRam);
+        Serial.println(F("\nHeap Allocation:"));
+        Serial.print(F("  Allocated: "));
+        Serial.print(leak_stats.total_allocated);
         Serial.println(F(" bytes"));
-        Serial.print(F("  Free:  "));
-        Serial.print(sys_info.freeRam);
+
+        Serial.print(F("  Freed:     "));
+        Serial.print(leak_stats.total_freed);
         Serial.println(F(" bytes"));
-        Serial.print(F("  Used:  "));
-        Serial.print(sys_info.totalRam - sys_info.freeRam);
+
+        Serial.print(F("  Current:   "));
+        Serial.print(leak_stats.current_usage);
         Serial.println(F(" bytes"));
-        Serial.print(F("  Usage: "));
-        Serial.print((uint32_t)(sys_info.totalRam - sys_info.freeRam) * 100UL / (uint32_t)sys_info.totalRam);
+
+        Serial.print(F("  Peak:      "));
+        Serial.print(leak_stats.peak_usage);
+        Serial.println(F(" bytes"));
+
+        // Calculate heap free space
+        uint16_t heap_total = 512; // Approximate heap size
+        uint16_t heap_free = heap_total - leak_stats.current_usage;
+
+        Serial.print(F("  Heap Free: "));
+        Serial.print(heap_free);
+        Serial.println(F(" bytes"));
+
+        Serial.print(F("  Heap Usage: "));
+        Serial.print((uint32_t)leak_stats.current_usage * 100UL / heap_total);
         Serial.println(F("%"));
+    }
+    else
+    {
+        Serial.println(F("\nHeap Allocation: Not available"));
+    }
 
-        // Heap Status
-        Serial.println(F("\nHeap:"));
-        Serial.print(F("  Size: "));
-        Serial.print(sys_info.heapSize);
-        Serial.println(F(" bytes"));
+    // Flash usage
+    Serial.println(F("\nFlash Usage:"));
+    Serial.print(F("  Program size: "));
+    Serial.print(getProgramSize());
+    Serial.println(F(" bytes"));
 
-        // Stack Usage
-        Serial.println(F("\nStack:"));
-        Serial.print(F("  Size:  "));
-        Serial.print(sys_info.stackSize);
-        Serial.println(F(" bytes"));
-        Serial.print(F("  Used:  "));
-        Serial.print(sys_info.stackUsed);
-        Serial.println(F(" bytes"));
-        Serial.print(F("  Free:  "));
-        Serial.print(sys_info.stackFree);
-        Serial.println(F(" bytes"));
+    Serial.print(F("  Available: "));
+    Serial.print(30720 - getProgramSize()); // 30KB flash
+    Serial.println(F(" bytes"));
 
-        // Task Memory
-        Serial.println(F("\nTasks:"));
-        Serial.print(F("  Count:  "));
-        Serial.println(sys_info.totalTasks);
+    Serial.print(F("  Usage: "));
+    Serial.print((uint32_t)getProgramSize() * 100UL / 30720UL);
+    Serial.println(F("%"));
 
-        // Message System
-        Serial.println(F("\nMessages:"));
-        Serial.print(F("  Active: "));
-        Serial.println(sys_info.activeMessages);
+    // EEPROM usage - calculate actual usage from EEPROM
+    Serial.println(F("\nEEPROM Usage:"));
 
-        // Flash Usage
-        Serial.println(F("\nProgram Memory:"));
-        Serial.print(F("  Used:  "));
-        Serial.print(sys_info.flashUsed);
-        Serial.println(F(" bytes"));
-        Serial.print(F("  Free:  "));
-        Serial.print(sys_info.flashFree);
-        Serial.println(F(" bytes"));
-        Serial.print(F("  Usage: "));
-        if (sys_info.flashUsed + sys_info.flashFree > 0)
-        {
-            Serial.print((uint32_t)sys_info.flashUsed * 100UL / (uint32_t)(sys_info.flashUsed + sys_info.flashFree));
-        }
-        else
-        {
-            Serial.print(F("N/A"));
-        }
-        Serial.println(F("%"));
+    // Get actual EEPROM usage by reading from EEPROM
+    uint16_t eeprom_used = getActualEEPROMUsage();
+    uint16_t eeprom_total = 1024; // Arduino Nano has 1KB EEPROM
+    uint16_t eeprom_free = eeprom_total - eeprom_used;
 
-        // EEPROM Usage
-        Serial.println(F("\nEEPROM:"));
-        Serial.print(F("  Used:  "));
-        Serial.print(sys_info.eepromUsed);
-        Serial.println(F(" bytes"));
-        Serial.print(F("  Free:  "));
-        Serial.print(sys_info.eepromFree);
-        Serial.println(F(" bytes"));
+    Serial.print(F("  Used:  "));
+    Serial.print(eeprom_used);
+    Serial.println(F(" bytes"));
 
-        // Memory Leak Detection Stats
-        MemoryStats leak_stats;
-        if (OS.getMemoryLeakStats(leak_stats))
-        {
-            Serial.println(F("\nMemory Leak Detection:"));
-            Serial.print(F("  Total Allocated: "));
-            Serial.print(leak_stats.total_allocated);
-            Serial.println(F(" bytes"));
-            Serial.print(F("  Total Freed:      "));
-            Serial.print(leak_stats.total_freed);
-            Serial.println(F(" bytes"));
-            Serial.print(F("  Current Usage:    "));
-            Serial.print(leak_stats.current_usage);
-            Serial.println(F(" bytes"));
-            Serial.print(F("  Peak Usage:       "));
-            Serial.print(leak_stats.peak_usage);
-            Serial.println(F(" bytes"));
+    Serial.print(F("  Free:  "));
+    Serial.print(eeprom_free);
+    Serial.println(F(" bytes"));
 
-            // Calculate leak detection
-            if (leak_stats.total_allocated > leak_stats.total_freed)
-            {
-                Serial.print(F("  Potential Leak:   "));
-                Serial.print(leak_stats.total_allocated - leak_stats.total_freed);
-                Serial.println(F(" bytes"));
-            }
-            else
-            {
-                Serial.println(F("  No leaks detected"));
-            }
-        }
-        Serial.print(F("  Usage: "));
-        if (sys_info.eepromUsed + sys_info.eepromFree > 0)
-        {
-            Serial.print((uint32_t)sys_info.eepromUsed * 100UL / (uint32_t)(sys_info.eepromUsed + sys_info.eepromFree));
-        }
-        else
-        {
-            Serial.print(F("N/A"));
-        }
-        Serial.println(F("%"));
+    Serial.print(F("  Usage: "));
+    Serial.print((uint32_t)eeprom_used * 100UL / eeprom_total);
+    Serial.println(F("%"));
 
-        // Task Details
-        Serial.println(F("\nTask Details:"));
-        Serial.println(F("============"));
+    Serial.println(F("  Layout:"));
+    Serial.println(F("    Address 0:   Light brightness (1 byte)"));
+    Serial.println(F("    Address 1:   Light state (1 byte)"));
+    Serial.println(F("    Address 16:  Password magic (1 byte)"));
+    Serial.println(F("    Address 17-20: Password (4 bytes)"));
 
-        // Print info for each task
-        for (uint8_t i = 0; i < OS.getTaskCount(); i++)
+    Serial.println(F("\n"));
+
+    // Task information with RAM usage
+    Serial.println(F("=== Task Information ==="));
+    uint8_t taskCount = OS.getTaskCount();
+    Serial.print(F("  Total Tasks: "));
+    Serial.println(taskCount);
+
+    uint16_t totalTaskMemory = 0;
+    uint8_t printedTasks = 0;
+    for (uint8_t i = 1; i <= taskCount; i++)  // Task IDs start from 1, not 0
+    {
+        TaskStats stats;
+        TaskMemoryInfo memInfo;
+        if (OS.getTaskStats(i, stats) && OS.getTaskMemoryInfo(i, memInfo))
         {
             Task *task = OS.getTask(i);
             if (task)
             {
-                TaskMemoryInfo task_info;
-                if (OS.getTaskMemoryInfo(i, task_info))
-                {
-                    Serial.print(F("\nTask '"));
-                    Serial.print(Task::readTaskName(task));
-                    Serial.println(F("':"));
-                    Serial.print(F("  Structure:    "));
-                    Serial.print(task_info.task_struct_size);
-                    Serial.println(F(" bytes"));
-                    Serial.print(F("  Subscriptions: "));
-                    Serial.print(task_info.subscription_size);
-                    Serial.println(F(" bytes"));
-                    Serial.print(F("  Total:        "));
-                    Serial.print(task_info.total_allocated);
-                    Serial.println(F(" bytes"));
-                }
+                Serial.print(F("  Task "));
+                Serial.print(i);
+                Serial.print(F(": "));
+                Serial.print(Task::readTaskName(task));
+                Serial.print(F(" (RAM: "));
+                Serial.print(memInfo.total_allocated);
+                Serial.print(F("B, Runs: "));
+                Serial.print(stats.runCount);
+                Serial.print(F(", Max: "));
+                Serial.print(stats.maxExecTimeUs);
+                Serial.println(F("us)"));
+
+                totalTaskMemory += memInfo.total_allocated;
+                printedTasks++;
             }
         }
-    }
-    else
-    {
-        Serial.println(F("Failed to get system memory information"));
+        else
+        {
+            // Task exists but stats/memory info failed
+            Serial.print(F("  Task "));
+            Serial.print(i);
+            Serial.println(F(": <stats unavailable>"));
+            printedTasks++;
+        }
     }
 
-    Serial.println(F(""));
+    Serial.print(F("  Printed Tasks: "));
+    Serial.print(printedTasks);
+    Serial.print(F("/"));
+    Serial.println(taskCount);
+    Serial.print(F("  Total Task RAM: "));
+    Serial.print(totalTaskMemory);
+    Serial.println(F(" bytes"));
+
+    Serial.println(F("\n"));
 }
 
 void SerialCommandTask::printUnknownCommand(const char *command)
@@ -741,36 +761,4 @@ void SerialCommandTask::printUnknownCommand(const char *command)
     Serial.print(command);
     Serial.println(F("'"));
     Serial.println(F("Type 'help' for available commands"));
-}
-
-void SerialCommandTask::handleTaskLimitCheck()
-{
-    uint8_t currentTasks = OS.getTaskCount();
-
-    Serial.println(F("\n=== Task Limit Check ==="));
-    Serial.print(F("Current tasks: "));
-    Serial.println(currentTasks);
-    Serial.print(F("Maximum tasks: "));
-    Serial.println(MAX_TOPICS);
-    Serial.print(F("Remaining slots: "));
-    Serial.println(MAX_TOPICS - currentTasks);
-
-    if (currentTasks >= MAX_TOPICS)
-    {
-        Serial.println(F("⚠️  TASK LIMIT REACHED!"));
-        Serial.println(F("Cannot add more tasks."));
-    }
-    else if (currentTasks >= MAX_TOPICS - 2)
-    {
-        Serial.println(F("⚠️  WARNING: Near task limit!"));
-        Serial.print(F("Only "));
-        Serial.print(MAX_TOPICS - currentTasks);
-        Serial.println(F(" slots remaining."));
-    }
-    else
-    {
-        Serial.println(F("✅ Task limit OK"));
-    }
-
-    Serial.println(F(""));
 }

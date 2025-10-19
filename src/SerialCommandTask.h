@@ -33,10 +33,8 @@ private:
     void handleLightCommand(const char *args);
     void handleChildLockCommand(const char *args);
     void handlePasswordCommand(const char *args);
-    void handleLEDStateCommand(const char *args);
     void handleFactoryResetCommand();
     void handleSensorStatus();
     void handleMemoryInfo();
-    void handleTaskLimitCheck();
     void printUnknownCommand(const char *command);
 };
