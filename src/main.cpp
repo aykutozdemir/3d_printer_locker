@@ -52,11 +52,11 @@ Timer16 debugMessageTimer;
  */
 void initializeAllTasks()
 {
-    Serial.println(F("Init tasks"));
+    Serial.println(F("Init"));
     Serial.println(F("Static alloc"));
 
     // Task instances are already created as static objects
-    Serial.println(F("Tasks ready"));
+    Serial.println(F("Ready"));
 }
 
 /**
@@ -64,7 +64,7 @@ void initializeAllTasks()
  */
 void initializeCompleteScheduler()
 {
-    Serial.println(F("Config FsmOS"));
+    Serial.println(F("Config OS"));
 
     // Set task periods (in milliseconds)
     buzzerTask.setPeriod(50);                       // 50ms - High frequency for sound control
@@ -109,17 +109,16 @@ void initializeCompleteScheduler()
 void displaySystemInfo()
 {
     Serial.println();
-    Serial.println(F("=== 3D PRINTER LOCKER v1.0 ==="));
-    Serial.println(F("HW: Nano 328P"));
-    Serial.println(F("FW: FsmOS v1.2.0"));
-    Serial.println(F("PIO"));
+    Serial.println(F("=== 3D PRINTER LOCKER ==="));
+    Serial.println(F("HW: Nano"));
+    Serial.println(F("FW: FsmOS"));
     Serial.print(F("Build: "));
     Serial.print(F(__DATE__));
     Serial.print(F(" "));
     Serial.println(F(__TIME__));
 
     // Display reset reason
-    Serial.println(F("=== Reset Info ==="));
+    Serial.println(F("=== Reset ==="));
     ResetInfo resetInfo;
     if (OS.getResetInfo(resetInfo))
     {
@@ -217,7 +216,7 @@ void setup()
     initializeCompleteScheduler();
 
     // Start the scheduler
-    Serial.println(F("Starting FsmOS..."));
+    Serial.println(F("Starting OS..."));
     Serial.println(F("OS.begin()..."));
 
     OS.begin();
@@ -226,14 +225,14 @@ void setup()
     OS.enableWatchdog(WDTO_2S);  // AVR: WDTO_2S = 2 seconds
     Serial.println(F("WDT=2s"));
 
-    Serial.println(F("OS.begin() OK"));
+    Serial.println(F("OS OK"));
 
     // Mark system as initialized
     systemInitialized = true;
 
     Serial.println(F("Init done"));
     Serial.println(F("System ready"));
-    Serial.println(F("Use serial CLI"));
+    Serial.println(F("Use CLI"));
     Serial.println();
 }
 

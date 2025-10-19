@@ -21,8 +21,8 @@ void DoorSensorTask::on_start()
     lastFrontDoorState = frontDoorState;
     lastTopDoorState = topDoorState;
 
-    logInfo(F("Task started - Front=D8, Top=D9"));
-    logInfo(F("Front=GND when closed, Top=GND when opened"));
+    logInfo(F("Started - Front=D8, Top=D9"));
+    logInfo(F("Front=GND closed, Top=GND opened"));
 }
 
 void DoorSensorTask::on_msg(const MsgData &msg)
@@ -43,14 +43,14 @@ void DoorSensorTask::step()
         if (frontDoorState)
         {
             // Front door opened (sensor reads LOW/GND)
-            publish(TOPIC_DOOR_SENSOR_EVENTS, EVT_DOOR_FRONT_OPENED, 0, nullptr);
-            logInfo(F("Front door opened"));
+            publish(TOPIC_DOOR_SENSOR_EVENTS, EVT_DOOR_FRONT_OPENED, 0);
+            logInfo(F("Front opened"));
         }
         else
         {
             // Front door closed (sensor reads HIGH)
-            publish(TOPIC_DOOR_SENSOR_EVENTS, EVT_DOOR_FRONT_CLOSED, 0, nullptr);
-            logInfo(F("Front door closed"));
+            publish(TOPIC_DOOR_SENSOR_EVENTS, EVT_DOOR_FRONT_CLOSED, 0);
+            logInfo(F("Front closed"));
         }
     }
 
@@ -61,14 +61,14 @@ void DoorSensorTask::step()
         if (topDoorState)
         {
             // Top door opened (sensor reads LOW/GND when closed, so HIGH when opened)
-            publish(TOPIC_DOOR_SENSOR_EVENTS, EVT_DOOR_TOP_OPENED, 0, nullptr);
-            logInfo(F("Top door opened"));
+            publish(TOPIC_DOOR_SENSOR_EVENTS, EVT_DOOR_TOP_OPENED, 0);
+            logInfo(F("Top opened"));
         }
         else
         {
             // Top door closed (sensor reads LOW/GND)
-            publish(TOPIC_DOOR_SENSOR_EVENTS, EVT_DOOR_TOP_CLOSED, 0, nullptr);
-            logInfo(F("Top door closed"));
+            publish(TOPIC_DOOR_SENSOR_EVENTS, EVT_DOOR_TOP_CLOSED, 0);
+            logInfo(F("Top closed"));
         }
     }
 }

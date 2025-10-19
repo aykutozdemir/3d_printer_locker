@@ -21,7 +21,7 @@ void BuzzerTask::on_start()
     // Start with buzzer off
     digitalWrite(BUZZER_PIN, LOW);
 
-    logInfo(F("Buzzer start"));
+    logInfo(F("Started"));
 }
 
 void BuzzerTask::on_msg(const MsgData &msg)
@@ -117,21 +117,21 @@ void BuzzerTask::playPasswordAccept()
 {
     // Play accept sound for first password entry completion
     startSound(1000, 200); // Medium pitch, medium duration
-    logInfo(F("Password accept sound"));
+    logInfo(F("Password accept"));
 }
 
 void BuzzerTask::playDoorOpen()
 {
     // Play door open sound for all doors
     startSound(1000, 300); // Medium pitch, medium duration
-    logInfo(F("Door open sound"));
+    logInfo(F("Door open"));
 }
 
 void BuzzerTask::playDoorClose()
 {
     // Play door close sound for all doors
     startSound(600, 150); // Lower pitch, shorter duration
-    logInfo(F("Door close sound"));
+    logInfo(F("Door close"));
 }
 
 void BuzzerTask::playPasswordChange()
@@ -141,7 +141,7 @@ void BuzzerTask::playPasswordChange()
     currentState = BUZZER_TRIPLE_BEEP;
     beepCount = 0;
     beepTimer = createTimerTyped<Timer16>(200); // Start first beep immediately
-    logInfo(F("Password change sound"));
+    logInfo(F("Password change"));
 }
 
 void BuzzerTask::playAngrySound()

@@ -30,7 +30,7 @@ void DoorControlTask::on_start()
     // Start with all doors locked (magnets engaged)
     lockAllDoors();
 
-    logInfo(F("DoorCtl start"));
+    logInfo(F("Started"));
     logInfo(F("Waiting for door events"));
 }
 
@@ -124,10 +124,10 @@ void DoorControlTask::releaseFrontDoor()
     frontDoorReengageLogged = false; // Reset logging flag for new cycle
 
     // Set LED to "to be opened" state (green blinking)
-    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0, nullptr);
+    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0);
 
     // Play door released sound
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0);
     logInfo(F("Front released"));
 }
 
@@ -139,10 +139,10 @@ void DoorControlTask::releaseTopDoor()
     topDoorReengageLogged = false; // Reset logging flag for new cycle
 
     // Set LED to "to be opened" state (green blinking)
-    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0, nullptr);
+    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0);
 
     // Play door released sound
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0);
     logInfo(F("Top released"));
 }
 
@@ -157,10 +157,10 @@ void DoorControlTask::releaseBothDoors()
     topDoorReengageLogged = false;  // Reset logging flag for new cycle
 
     // Set LED to "to be opened" state (green blinking)
-    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0, nullptr);
+    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0);
 
     // Play door released sound
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0);
     logInfo(F("Both released"));
 }
 
@@ -173,7 +173,7 @@ void DoorControlTask::lockAllDoors()
     waitingForDoorOpen = false;
 
     // Play door closed sound
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_CLOSE, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_CLOSE, 0);
 
     logInfo(F("All locked"));
 }
@@ -190,12 +190,12 @@ void DoorControlTask::updateStatusLEDs()
         if (currentLEDState)
         {
             // At least one door is actually opened - set status LED to green (unlocked)
-            publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_UNLOCKED, 0, nullptr);
+            publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_UNLOCKED, 0);
         }
         else
         {
             // All doors are closed - set status LED to red (locked)
-            publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_LOCKED, 0, nullptr);
+            publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_LOCKED, 0);
         }
     }
 }
@@ -223,7 +223,7 @@ void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
                 // Unauthorized access - door opened without password
                 logWarn(F("UNAUTH Front!"));
                 unauthorizedAccessActive = true;
-                publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0, nullptr);
+                publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0);
             }
             break;
 
@@ -239,7 +239,7 @@ void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
                 // Unauthorized access - door opened without password
                 logWarn(F("UNAUTH Top!"));
                 unauthorizedAccessActive = true;
-                publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0, nullptr);
+                publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0);
             }
             break;
 
@@ -291,7 +291,7 @@ void DoorControlTask::handleDoorSensorEvent(uint8_t eventType)
     {
         // Door has been opened - change to green solid (unlocked)
         waitingForDoorOpen = false;
-        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_UNLOCKED, 0, nullptr);
+        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_UNLOCKED, 0);
         logInfo(F("Door opened -> LED green"));
     }
 }
@@ -346,7 +346,7 @@ void DoorControlTask::handleStartupDoorDetection(uint8_t eventType)
             topDoorOpened = (topDoorStartupState == 1);
 
             // Update LED to unlocked state
-            publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_UNLOCKED, 0, nullptr);
+            publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_UNLOCKED, 0);
             lastLEDState = true;
         }
         else

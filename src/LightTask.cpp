@@ -45,7 +45,7 @@ void LightTask::on_start()
     }
 
     logInfo(F("Task started - Pin D10, 10-bit PWM"));
-    logInfof(F("Saved dim level: %u%%"), savedDimLevel);
+    logInfof(F("Dim level: %u%%"), savedDimLevel);
 }
 
 void LightTask::on_msg(const MsgData &msg)
@@ -61,7 +61,7 @@ void LightTask::on_msg(const MsgData &msg)
                     currentDimLevel = savedDimLevel;
                     setLightState(true);
                     currentState = LIGHT_ON;
-                    logInfof(F("MB sensor: Light ON at %u%%"), currentDimLevel);
+                    logInfof(F("MB sensor: ON at %u%%"), currentDimLevel);
                 }
                 else
                 {
@@ -92,14 +92,14 @@ void LightTask::on_msg(const MsgData &msg)
                     currentDimLevel = savedDimLevel;
                     setLightState(true);
                     currentState = LIGHT_ON;
-                    logInfof(F("Turned %S at %u%% (manual override)"), F("ON"), currentDimLevel);
+                    logInfof(F("Manual %S at %u%%"), F("ON"), currentDimLevel);
                 }
                 else
                 {
                     // Turn off
                     setLightState(false);
                     currentState = LIGHT_OFF;
-                    logInfof(F("Turned %S (manual override)"), F("OFF"));
+                    logInfof(F("Manual %S"), F("OFF"));
                 }
             }
             break;
@@ -121,7 +121,7 @@ void LightTask::on_msg(const MsgData &msg)
                 // Save current dim level and return to ON state
                 saveDimLevel();
                 currentState = LIGHT_ON;
-                logInfof(F("Dimming stopped - saved level: %u%%"), savedDimLevel);
+                logInfof(F("Dim stopped - level: %u%%"), savedDimLevel);
             }
             break;
 

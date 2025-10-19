@@ -49,8 +49,8 @@ SerialCommandTask::SerialCommandTask() : Task(F("SerialCommand"))
 
 void SerialCommandTask::on_start()
 {
-    logInfo(F("Task started"));
-    Serial.println(F("Type 'help' for commands"));
+    logInfo(F("Started"));
+    Serial.println(F("Type 'h' for help"));
 }
 
 void SerialCommandTask::step()
@@ -169,6 +169,10 @@ void SerialCommandTask::processCommand(const char *command)
     {
         handleLightStatus();
     }
+    else if (equalsIgnoreCase_P(command, PSTR("tasklimit")) || equalsIgnoreCase_P(command, PSTR("tl")))
+    {
+        handleTaskLimitCheck();
+    }
     else
     {
         printUnknownCommand(command);
@@ -178,46 +182,27 @@ void SerialCommandTask::processCommand(const char *command)
 void SerialCommandTask::printHelp()
 {
     Serial.println(F("=== Commands ==="));
-    Serial.println(F("help, h          - Show help"));
-    Serial.println(F("stats, s         - Task stats"));
-    Serial.println(F("reset, r         - Reset info"));
-    Serial.println(F("uptime, u        - Uptime"));
-    Serial.println(F("status, st       - System status"));
-    Serial.println(F("led <state>      - LED control"));
-    Serial.println(F("ledstate <name>  - LED state"));
-    Serial.println(F("light <cmd>      - Light control"));
-    Serial.println(F("childlock <cmd>  - Child lock"));
-    Serial.println(F("password <cmd>   - Password ops"));
-    Serial.println(F("factoryreset     - Reset EEPROM"));
-    Serial.println(F("sensors          - Sensor status"));
-    Serial.println(F("memory, mem      - Memory info"));
-    Serial.println(F("test, t          - Test keypad"));
-    Serial.println(F("buzzer, b        - Test buzzer"));
-    Serial.println(F("clear, c         - Clear screen"));
-    Serial.println(F("resetlight, rl   - Reset light manual override"));
-    Serial.println(F("lightstatus, ls  - Check light status"));
+    Serial.println(F("h-help s-stats r-reset u-uptime"));
+    Serial.println(F("st-status led-ledstate light childlock"));
+    Serial.println(F("password factoryreset sensors mem"));
+    Serial.println(F("t-test b-buzzer c-clear rl-resetlight"));
+    Serial.println(F("ls-lightstatus tl-tasklimit"));
     Serial.println(F(""));
     Serial.println(F("=== LED States ==="));
-    Serial.println(F("led locked       - Red solid"));
-    Serial.println(F("led unlocked     - Green solid"));
-    Serial.println(F("led to_be_locked - Red blinking"));
+    Serial.println(F("led locked/unlocked/to_be_locked"));
     Serial.println(F(""));
     Serial.println(F("=== Light Commands ==="));
-    Serial.println(F("light on         - Turn light on"));
-    Serial.println(F("light off        - Turn light off"));
-    Serial.println(F("light toggle     - Toggle light"));
+    Serial.println(F("light on/off/toggle"));
     Serial.println(F(""));
     Serial.println(F("=== Child Lock Commands ==="));
-    Serial.println(F("childlock engage - Engage child lock"));
-    Serial.println(F("childlock release- Release child lock"));
-    Serial.println(F("childlock status - Show child lock status"));
+    Serial.println(F("childlock engage/release/status"));
 }
 
 void SerialCommandTask::printTaskStats()
 {
     uint8_t taskCount = OS.getTaskCount();
-    Serial.print(F("=== Task Statistics ===\n"));
-    Serial.print(F("Total tasks: "));
+    Serial.print(F("=== Task Stats ===\n"));
+    Serial.print(F("Tasks: "));
     Serial.println(taskCount);
 
     for (uint8_t i = 0; i < taskCount; i++)
@@ -258,7 +243,7 @@ void SerialCommandTask::printResetInfo()
     ResetInfo resetInfo;
     if (OS.getResetInfo(resetInfo))
     {
-        Serial.println(F("=== Reset Information ==="));
+        Serial.println(F("=== Reset Info ==="));
         Serial.print(F("Reset Reason: "));
         Serial.print(resetInfo.resetReason);
         Serial.print(F(", Last task: "));
@@ -269,7 +254,7 @@ void SerialCommandTask::printResetInfo()
 void SerialCommandTask::printUptime()
 {
     uint32_t uptime = OS.now();
-    Serial.println(F("=== System Uptime ==="));
+    Serial.println(F("=== Uptime ==="));
     Serial.print(F("Uptime: "));
     Serial.print(uptime / 1000);
     Serial.print(F("s ("));
@@ -279,7 +264,7 @@ void SerialCommandTask::printUptime()
 
 void SerialCommandTask::printSystemStatus()
 {
-    Serial.println(F("=== System Status ==="));
+    Serial.println(F("=== Status ==="));
     Serial.println(F("3D Printer Locker System"));
     Serial.println(F("Hardware:"));
     Serial.print(F("  Yellow Button: D"));
@@ -313,18 +298,18 @@ void SerialCommandTask::handleLEDCommand(const char *args)
     }
     if (strcasecmp(args, "locked") == 0)
     {
-        logInfo(F("Setting LED to LOCKED (red solid)"));
-        publish(EVT_LED_LOCKED, 0, 0, nullptr);
+        logInfo(F("LED LOCKED"));
+        publish(EVT_LED_LOCKED, 0, 0);
     }
     else if (strcasecmp(args, "unlocked") == 0)
     {
-        logInfo(F("Setting LED to UNLOCKED (green solid)"));
-        publish(EVT_LED_UNLOCKED, 0, 0, nullptr);
+        logInfo(F("LED UNLOCKED"));
+        publish(EVT_LED_UNLOCKED, 0, 0);
     }
     else if (strcasecmp(args, "to_be_locked") == 0)
     {
-        logInfo(F("Setting LED to TO_BE_LOCKED (red blinking)"));
-        publish(EVT_LED_TO_BE_LOCKED, 0, 0, nullptr);
+        logInfo(F("LED TO_BE_LOCKED"));
+        publish(EVT_LED_TO_BE_LOCKED, 0, 0);
     }
     else
     {
@@ -335,67 +320,53 @@ void SerialCommandTask::handleLEDCommand(const char *args)
 void SerialCommandTask::handleKeypadTest()
 {
     Serial.println(F("=== Keypad Test ==="));
-    Serial.println(F("Press keypad buttons 1-4 to test:"));
-    Serial.println(F("  1: LOCKED (red solid)"));
-    Serial.println(F("  2: UNLOCKED (green solid)"));
-    Serial.println(F("  3: TO_BE_LOCKED (red blinking)"));
-    Serial.println(F("  4: Cycle through states"));
-    Serial.println(F("Press yellow button for short/long click test"));
-    Serial.println(F("Type 'help' to return to command mode"));
+    Serial.println(F("Press 1-4: LED states"));
+    Serial.println(F("Yellow: short/long test"));
 }
 
 void SerialCommandTask::handleBuzzerTest()
 {
     Serial.println(F("=== Buzzer Test ==="));
-    Serial.println(F("Testing simplified buzzer sounds..."));
+    Serial.println(F("Testing sounds..."));
 
     // Test simplified buzzer sounds
-    Serial.println(F("1. Button press sound..."));
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0);
     delay(1000);
 
-    Serial.println(F("2. Password change sound..."));
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_CHANGE, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_CHANGE, 0);
     delay(2000); // Wait for triple-beep to complete
 
-    Serial.println(F("3. Password accept sound..."));
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0);
     delay(1000);
 
-    Serial.println(F("4. Door open sound..."));
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_OPEN, 0);
     delay(1000);
 
-    Serial.println(F("5. Door close sound..."));
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_CLOSE, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_DOOR_CLOSE, 0);
     delay(1000);
 
-    Serial.println(F("6. Angry sound..."));
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0);
     delay(1000);
 
-    Serial.println(F("Buzzer test complete!"));
+    Serial.println(F("Test complete!"));
 }
 
 void SerialCommandTask::handleResetLightOverride()
 {
-    Serial.println(F("=== Reset Light Override ==="));
-    Serial.println(F("Resetting manual override mode - MB sensor will control light again"));
+    Serial.println(F("=== Reset Light ==="));
+    Serial.println(F("Resetting manual override"));
 
     // Send a special message to reset manual override
     // We'll use a new event type for this
-    publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_RESET_OVERRIDE, 0, nullptr);
+    publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_RESET_OVERRIDE, 0);
 
-    Serial.println(F("Manual override reset complete"));
+    Serial.println(F("Override reset complete"));
 }
 
 void SerialCommandTask::handleLightStatus()
 {
     Serial.println(F("=== Light Status ==="));
-    Serial.println(F("Check serial output for light control messages"));
-    Serial.println(F("Look for: 'MB sensor ON ignored (manual override)'"));
-    Serial.println(F("If you see that message, manual override is active"));
-    Serial.println(F("Use 'resetlight' command to disable manual override"));
+    Serial.println(F("Check for 'MB sensor ON ignored' message"));
 }
 
 void SerialCommandTask::handleLightCommand(const char *args)
@@ -406,18 +377,18 @@ void SerialCommandTask::handleLightCommand(const char *args)
     }
     if (strcasecmp(args, "on") == 0)
     {
-        logInfof(F("Turning light %S"), F("ON"));
-        publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_TOGGLE, 1, nullptr);
+        logInfof(F("Light %S"), F("ON"));
+        publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_TOGGLE, 1);
     }
     else if (strcasecmp(args, "off") == 0)
     {
-        logInfof(F("Turning light %S"), F("OFF"));
-        publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_TOGGLE, 0, nullptr);
+        logInfof(F("Light %S"), F("OFF"));
+        publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_TOGGLE, 0);
     }
     else if (strcasecmp(args, "toggle") == 0)
     {
         logInfo(F("Toggling light"));
-        publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_TOGGLE, 2, nullptr);
+        publish(TOPIC_LIGHT_EVENTS, EVT_LIGHT_TOGGLE, 2);
     }
     else
     {
@@ -434,17 +405,17 @@ void SerialCommandTask::handleChildLockCommand(const char *args)
     if (strcasecmp(args, "engage") == 0)
     {
         logInfo(F("Engaging child lock"));
-        publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_ENGAGE, 0, nullptr);
+        publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_ENGAGE, 0);
     }
     else if (strcasecmp(args, "release") == 0)
     {
         logInfo(F("Releasing child lock"));
-        publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_RELEASE, 0, nullptr);
+        publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_RELEASE, 0);
     }
     else if (strcasecmp(args, "reset") == 0)
     {
         logInfo(F("Resetting child lock timeout"));
-        publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_TIMEOUT_RESET, 0, nullptr);
+        publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_TIMEOUT_RESET, 0);
     }
     else if (strcasecmp(args, "status") == 0)
     {
@@ -471,7 +442,7 @@ void SerialCommandTask::handlePasswordCommand(const char *args)
     else if (strcasecmp(args, "reload") == 0)
     {
         logInfo(F("Requesting password reload from EEPROM"));
-        publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_RELOAD_REQUEST, 0, nullptr);
+        publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_RELOAD_REQUEST, 0);
     }
     else if (startsWithIgnoreCase_P(args, PSTR("set ")))
     {
@@ -480,7 +451,7 @@ void SerialCommandTask::handlePasswordCommand(const char *args)
     else if (equalsIgnoreCase_P(args, PSTR("factory")))
     {
         logInfo(F("Forcing factory password now"));
-        publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_SET_FACTORY, 0, nullptr);
+        publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_SET_FACTORY, 0);
     }
     else if (startsWithIgnoreCase_P(args, PSTR("inject ")))
     {
@@ -514,7 +485,7 @@ void SerialCommandTask::handlePasswordCommand(const char *args)
             {
                 break;
             }
-            publish(TOPIC_KEYPAD_EVENTS, evt, 0, nullptr);
+            publish(TOPIC_KEYPAD_EVENTS, evt, 0);
             p++;
         }
         Serial.println(F("Injected keypad digits to password manager topic."));
@@ -533,23 +504,23 @@ void SerialCommandTask::handleLEDStateCommand(const char *args)
     }
     if (strcasecmp(args, "locked") == 0)
     {
-        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_LOCKED, 0, nullptr);
+        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_LOCKED, 0);
     }
     else if (strcasecmp(args, "unlocked") == 0)
     {
-        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_UNLOCKED, 0, nullptr);
+        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_UNLOCKED, 0);
     }
     else if (strcasecmp(args, "to_be_locked") == 0)
     {
-        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_LOCKED, 0, nullptr);
+        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_LOCKED, 0);
     }
     else if (strcasecmp(args, "to_be_opened") == 0)
     {
-        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0, nullptr);
+        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_TO_BE_OPENED, 0);
     }
     else if (strcasecmp(args, "child_unlocked") == 0)
     {
-        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_CHILD_UNLOCKED, 0, nullptr);
+        publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_CHILD_UNLOCKED, 0);
     }
     else
     {
@@ -572,10 +543,10 @@ void SerialCommandTask::handleFactoryResetCommand()
         eeprom_write_byte((uint8_t *)(EEPROM_PASSWORD_ADDR + i), (uint8_t)def[i]);
     }
     // Re-engage child lock and set LEDs
-    publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_ENGAGE, 0, nullptr);
-    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_LOCKED, 0, nullptr);
+    publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_ENGAGE, 0);
+    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_LOCKED, 0);
     // Notify password manager to reload
-    publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_RELOAD_REQUEST, 0, nullptr);
+    publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_RELOAD_REQUEST, 0);
     Serial.println(F("Factory reset complete."));
 }
 
@@ -685,6 +656,37 @@ void SerialCommandTask::handleMemoryInfo()
         Serial.print(F("  Free:  "));
         Serial.print(sys_info.eepromFree);
         Serial.println(F(" bytes"));
+
+        // Memory Leak Detection Stats
+        MemoryStats leak_stats;
+        if (OS.getMemoryLeakStats(leak_stats))
+        {
+            Serial.println(F("\nMemory Leak Detection:"));
+            Serial.print(F("  Total Allocated: "));
+            Serial.print(leak_stats.total_allocated);
+            Serial.println(F(" bytes"));
+            Serial.print(F("  Total Freed:      "));
+            Serial.print(leak_stats.total_freed);
+            Serial.println(F(" bytes"));
+            Serial.print(F("  Current Usage:    "));
+            Serial.print(leak_stats.current_usage);
+            Serial.println(F(" bytes"));
+            Serial.print(F("  Peak Usage:       "));
+            Serial.print(leak_stats.peak_usage);
+            Serial.println(F(" bytes"));
+
+            // Calculate leak detection
+            if (leak_stats.total_allocated > leak_stats.total_freed)
+            {
+                Serial.print(F("  Potential Leak:   "));
+                Serial.print(leak_stats.total_allocated - leak_stats.total_freed);
+                Serial.println(F(" bytes"));
+            }
+            else
+            {
+                Serial.println(F("  No leaks detected"));
+            }
+        }
         Serial.print(F("  Usage: "));
         if (sys_info.eepromUsed + sys_info.eepromFree > 0)
         {
@@ -739,4 +741,36 @@ void SerialCommandTask::printUnknownCommand(const char *command)
     Serial.print(command);
     Serial.println(F("'"));
     Serial.println(F("Type 'help' for available commands"));
+}
+
+void SerialCommandTask::handleTaskLimitCheck()
+{
+    uint8_t currentTasks = OS.getTaskCount();
+
+    Serial.println(F("\n=== Task Limit Check ==="));
+    Serial.print(F("Current tasks: "));
+    Serial.println(currentTasks);
+    Serial.print(F("Maximum tasks: "));
+    Serial.println(MAX_TOPICS);
+    Serial.print(F("Remaining slots: "));
+    Serial.println(MAX_TOPICS - currentTasks);
+
+    if (currentTasks >= MAX_TOPICS)
+    {
+        Serial.println(F("⚠️  TASK LIMIT REACHED!"));
+        Serial.println(F("Cannot add more tasks."));
+    }
+    else if (currentTasks >= MAX_TOPICS - 2)
+    {
+        Serial.println(F("⚠️  WARNING: Near task limit!"));
+        Serial.print(F("Only "));
+        Serial.print(MAX_TOPICS - currentTasks);
+        Serial.println(F(" slots remaining."));
+    }
+    else
+    {
+        Serial.println(F("✅ Task limit OK"));
+    }
+
+    Serial.println(F(""));
 }

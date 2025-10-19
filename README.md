@@ -1,6 +1,6 @@
 # 3D Printer Door Locker & LED Brightness Controller
 
-This project adds **secure dual‑door locking** and **internal LED brightness control** to a Flashforge Adventurer 5M Pro (or similar) 3D printer. It manages front and top doors with 12 V solenoid locks, mirrors/toggles the printer’s built‑in light, provides a child‑lock for the power button and touchscreen, and offers clear buzzer/LED feedback.
+This project adds **secure dual‑door locking** and **internal LED brightness control** to a Flashforge Adventurer 5M Pro (or similar) 3D printer. It manages front and top doors with 12 V solenoid locks, mirrors/toggles the printer's built‑in light, provides a child‑lock for the power button and touchscreen, and offers clear buzzer/LED feedback.
 
 ---
 
@@ -8,10 +8,11 @@ This project adds **secure dual‑door locking** and **internal LED brightness c
 
 This project is fully optimized for **PlatformIO** with comprehensive build optimizations:
 
-- **Memory Usage**: 25.6% RAM (525/2048 bytes), 8.9% Flash (2908/30720 bytes)
+- **Memory Usage**: 64.2% RAM (1315/2048 bytes), 95.8% Flash (29426/30720 bytes)
 - **Build Time**: Sub-second compilation
 - **Multiple Build Profiles**: Standard, Size-optimized, Speed-optimized, Debug
 - **Professional Tooling**: VS Code integration, build scripts, Makefile support
+- **FsmOS Integration**: Custom cooperative task scheduler with memory optimization
 
 ### Quick Start
 ```bash
@@ -32,12 +33,44 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 
 ---
 
+## 🧠 FsmOS Operating System
+
+This project uses **FsmOS**, a custom cooperative task scheduler optimized for Arduino:
+
+### Key Features
+- **Cooperative Multitasking**: Run multiple tasks without preemption
+- **Message Passing**: Inter-task communication with publish/subscribe
+- **Memory Efficient**: Optimized for AVR microcontrollers
+- **Stack Canary Protection**: Automatic stack overflow detection
+- **Memory Leak Detection**: Built-in memory allocation tracking
+- **Task Limit Control**: Configurable maximum task count
+
+### Memory Optimization
+- **Simplified Message System**: Only type + argument data (no dynamic allocation)
+- **Stack Canary**: Marks entire free RAM region between heap and stack
+- **Memory Leak Detection**: Always active, tracks all allocations
+- **Task Budgeting**: Prevents message queue overruns
+
+### Configuration
+```cpp
+// Topic bitfield size (8, 16, or 32 topics max)
+-DTOPIC_BITFIELD_SIZE=16
+
+// Stack canary safety margin
+#define FSMOS_STACK_CANARY_MARGIN 32
+
+// Message pool size
+#define MAX_MESSAGE_POOL_SIZE 32
+```
+
+---
+
 ## 1) Hardware Overview
 
 **Controller & Power**
 
-* Arduino Nano (5 V)
-* 24 V printer rail → **12 V regulator** (for solenoids, LED strip, MOSFET module)
+* Arduino Nano (5 V)
+* 24 V printer rail → **12 V regulator** (for solenoids, LED strip, MOSFET module)
 * Buzzer (active preferred)
 
 **Inputs**
@@ -52,18 +85,18 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 
 * **3× MOSFET channels** (low‑side):
 
-  * CH1 → **LED strip (12 V, PWM brightness)**
-  * CH2 → **Front door solenoid (12 V)**
-  * CH3 → **Top door solenoid (12 V)**
+  * CH1 → **LED strip (12 V, PWM brightness)**
+  * CH2 → **Front door solenoid (12 V)**
+  * CH3 → **Top door solenoid (12 V)**
 * Bi‑color **Red/Green LED** (status)
-* **Child‑lock outputs (2)** → *5 V = enabled* / *0 V = disabled*
+* **Child‑lock outputs (2)** → *5 V = enabled* / *0 V = disabled*
 
   * Printer power button enable
   * Touchscreen enable
 
 **Notes**
 
-* Solenoids: **fail‑secure** (no power = locked), **power ~5 s to release**
+* Solenoids: **fail‑secure** (no power = locked), **power ~5 s to release**
 * All grounds are **common** (Nano, MOSFETs, loads, inputs)
 
 ---
@@ -79,7 +112,7 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 | Keypad Line 3              | **D4**   | Internal pull‑up                   |
 | Keypad Line 4              | **D5**   | Internal pull‑up                   |
 | Yellow Button              | **D6**   | Internal pull‑up, short/long press |
-| Motherboard Light Sense    | **D7**   | Use divider/optocoupler if >5 V    |
+| Motherboard Light Sense    | **D7**   | Use divider/optocoupler if >5 V    |
 | Front Door Switch          | **D8**   | Internal pull‑up                   |
 | Top Door Switches (series) | **D9**   | Internal pull‑up                   |
 | Device Running Sense       | **A4**   | Internal pull-up, LOW when not running |
@@ -106,7 +139,7 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 ### 3.1 Default State (Power‑Up)
 
 * System starts **LOCKED** (solenoids off)
-* **Child‑lock active** → power + touchscreen **disabled (0 V)**
+* **Child‑lock active** → power + touchscreen **disabled (0 V)**
 * Status LED = **Red**
 * LED strip state restored from EEPROM (on/off + brightness)
 
@@ -128,7 +161,7 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 
 * Passwords are **always 4 digits**
 * **Factory default password: `1234`**
-* **Digit timeout**: 3 s between key presses (resets the entry if exceeded)
+* **Digit timeout**: 3 s between key presses (resets the entry if exceeded)
 * After entering 4 digits:
 
   * **Correct** → *accept beep* and wait for **option**
@@ -136,8 +169,8 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 
 **Options after correct password**
 
-* `+1` → **Top door unlock** (solenoid ~5 s)
-* `+2` → **Front door unlock** (solenoid ~5 s)
+* `+1` → **Top door unlock** (solenoid ~5 s)
+* `+2` → **Front door unlock** (solenoid ~5 s)
 * `+3` → **Both doors unlock**
 * `+4` → **Child‑lock disable** (starts a 1-minute timeout)
 * **Short press Yellow Button** → **Password change mode**
@@ -157,7 +190,7 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 ### 3.4 Auto‑Locking
 
 * If a door **was opened and then closed** → **lock immediately** upon closure (magnets re‑engaged)
-* Magnets re‑engage **~1.5 s after a door opens** (safety hold‑off) or **~100 ms after a door closes**
+* Magnets re‑engage **~1.5 s after a door opens** (safety hold‑off) or **~100 ms after a door closes**
 * Child lock will be enabled automatically after **1 minute** of being disabled (or sooner via keypad 1 long‑press)
 
 ### 3.5 Unauthorized Access
@@ -200,10 +233,10 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 
 | Event                       | Value       | Notes                         |
 | --------------------------- | ----------- | ----------------------------- |
-| Magnet re‑engage (after open) | **~1.5 s** | Hold‑off before re‑engage     |
-| Magnet re‑engage (after close) | **~100 ms** | Re‑engage after closure      |
-| Keypad digit timeout        | **3 s**     | Between digits                |
-| Yellow long‑press threshold | **~1 s**    | Start brightness stepping     |
+| Magnet re‑engage (after open) | **~1.5 s** | Hold‑off before re‑engage     |
+| Magnet re‑engage (after close) | **~100 ms** | Re‑engage after closure      |
+| Keypad digit timeout        | **3 s**     | Between digits                |
+| Yellow long‑press threshold | **~1 s**    | Start brightness stepping     |
 | Brightness step             | **10% / s** | Ping‑pong 0↔100%              |
 | Child lock timeout          | **1 min**   | Auto-enables child lock       |
 
@@ -211,7 +244,7 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 
 ## 6) EEPROM Data
 
-* Last LED **brightness** (0–100 %) — address 0
+* Last LED **brightness** (0–100 %) — address 0
 * Last LED **on/off** state (0=OFF,1=ON) — address 1
 * Current **password** (factory: `1234`) — addresses 17..20, with magic at 16
 
@@ -223,7 +256,7 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 * **Actions**:
 
   * Reset password → **`1234`** (and set EEPROM magic)
-  * LED brightness → **100 %**; LED state → **OFF**
+  * LED brightness → **100 %**; LED state → **OFF**
   * Re‑engage child‑lock, set status LED to **LOCKED**
 * Use `password reload` to force a runtime reload of the PIN if needed.
 
@@ -241,56 +274,59 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 | `childlock <engage|release|status|reset>` | Engage/release, show status, or reset 1‑min timeout |
 | `password <show|reload|set 1234>` | PIN ops; `reload` re‑reads EEPROM; use keypad to change PIN |
 | `factoryreset`           | Reset EEPROM to defaults (dangerous) |
+| `mem`                    | Memory usage information |
+| `tl`                     | Task limit check |
+| `s`                      | System statistics |
 
 ---
 
 ## 9) Protection & Component Values
 
-### 8.1 Solenoids (12 V)
+### 8.1 Solenoids (12 V)
 
-* **Flyback diode (each coil)**: **SS34** (3 A, 40 V Schottky) or **1N5819** (1 A, 40 V)
+* **Flyback diode (each coil)**: **SS34** (3 A, 40 V Schottky) or **1N5819** (1 A, 40 V)
 
-  * Cathode → **+12 V**, Anode → **MOSFET/drain**
-* *(Optional fast release)* **TVS**: **SMBJ16A** across coil (or RC snubber 100 Ω/1–2 W + 100 nF ≥50 V film)
-* Local bulk cap near drivers: **220–470 µF / 25 V**
+  * Cathode → **+12 V**, Anode → **MOSFET/drain**
+* *(Optional fast release)* **TVS**: **SMBJ16A** across coil (or RC snubber 100 Ω/1–2 W + 100 nF ≥50 V film)
+* Local bulk cap near drivers: **220–470 µF / 25 V**
 
-### 8.2 LED Strip (12 V, PWM)
+### 8.2 LED Strip (12 V, PWM)
 
 * If the MOSFET module lacks gate network (discrete build only):
 
-  * Gate series: **100–220 Ω**; Gate pulldown: **100 kΩ**
-* **12 V rail TVS**: **SMBJ16A** across 12 V–GND
+  * Gate series: **100–220 Ω**; Gate pulldown: **100 kΩ**
+* **12 V rail TVS**: **SMBJ16A** across 12 V–GND
 
-### 8.3 12 V Supply Rail
+### 8.3 12 V Supply Rail
 
-* Reverse polarity: **SS54** (5 A Schottky) in series (or ideal‑diode P‑MOSFET stage)
-* Bulk: **470–1000 µF / 25 V** electrolytic + **100 nF** ceramics near modules
+* Reverse polarity: **SS54** (5 A Schottky) in series (or ideal‑diode P‑MOSFET stage)
+* Bulk: **470–1000 µF / 25 V** electrolytic + **100 nF** ceramics near modules
 
-### 8.4 Child‑Lock Outputs (5 V)
+### 8.4 Child‑Lock Outputs (5 V)
 
-* If high‑impedance inputs (<5 mA): drive from Nano; add **220–330 Ω** series for protection
-* If you prefer open‑collector logic: **2N2222** NPN, **1 kΩ** base resistor; add **10 kΩ pull‑up** to 5 V on the line
+* If high‑impedance inputs (<5 mA): drive from Nano; add **220–330 Ω** series for protection
+* If you prefer open‑collector logic: **2N2222** NPN, **1 kΩ** base resistor; add **10 kΩ pull‑up** to 5 V on the line
 
 ### 8.5 Status LED (Bi‑Color)
 
-* One resistor **per color**: **330–680 Ω** at 5 V (680 Ω is comfortable)
-* Common cathode → GND (pin HIGH = on) or common anode → +5 V (pin LOW = on)
+* One resistor **per color**: **330–680 Ω** at 5 V (680 Ω is comfortable)
+* Common cathode → GND (pin HIGH = on) or common anode → +5 V (pin LOW = on)
 
 ### 8.6 Buzzer
 
-* **Active 5 V buzzer** (<20 mA): direct from Nano (optionally **220 Ω** series)
-* **Passive/higher current**: 2N2222 driver + **1 kΩ** base resistor
+* **Active 5 V buzzer** (<20 mA): direct from Nano (optionally **220 Ω** series)
+* **Passive/higher current**: 2N2222 driver + **1 kΩ** base resistor
 
 ### 8.7 Keypad & Buttons
 
 * Using internal pull‑ups is sufficient; optional extras:
-* External pull‑ups **10kΩ** and/or **100 nF** to GND for hardware debounce
-* Series to MCU pins **100–220 Ω** for ESD protection
+* External pull‑ups **10kΩ** and/or **100 nF** to GND for hardware debounce
+* Series to MCU pins **100–220 Ω** for ESD protection
 
 ### 8.8 Motherboard Light‑Sense Input
 
-* If it’s an **open‑collector to GND**: add **10 kΩ pull‑up to 5 V** + **220 Ω** series to the pin
-* If it can be **24 V**: use a divider **100 kΩ : 27 kΩ** → ~4.8 V at the pin (optional 5.1 V zener/TVS clamp), or use **PC817 optocoupler** (24 V side ~2.2 kΩ series)
+* If it's an **open‑collector to GND**: add **10 kΩ pull‑up to 5 V** + **220 Ω** series to the pin
+* If it can be **24 V**: use a divider **100 kΩ : 27 kΩ** → ~4.8 V at the pin (optional 5.1 V zener/TVS clamp), or use **PC817 optocoupler** (24 V side ~2.2 kΩ series)
 
 ---
 
@@ -298,17 +334,17 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 
 | Use                     | Part                       | Qty       |
 | ----------------------- | -------------------------- | --------- |
-| Solenoid flyback        | **SS34** (3 A, 40 V)       | 2         |
+| Solenoid flyback        | **SS34** (3 A, 40 V)       | 2         |
 | (Optional) coil TVS     | **SMBJ16A**                | 2         |
-| 12 V rail TVS           | **SMBJ16A**                | 1         |
-| Reverse‑polarity        | **SS54** (5 A Schottky)    | 1         |
-| Bulk electrolytic       | **470–1000 µF / 25 V**     | 2–3       |
-| Decoupling              | **100 nF ceramics**        | 10+       |
-| LED resistors           | **680 Ω**                  | 2         |
-| Child‑lock pull‑up      | **10 kΩ**                  | 2 (if OC) |
-| NPN drivers             | **2N2222** + **1 kΩ base** | as needed |
-| Divider for Light‑Sense | **100 kΩ + 27 kΩ**         | 1 set     |
-| Optocoupler (alt)       | **PC817** + **2.2 kΩ**     | 1         |
+| 12 V rail TVS           | **SMBJ16A**                | 1         |
+| Reverse‑polarity        | **SS54** (5 A Schottky)    | 1         |
+| Bulk electrolytic       | **470–1000 µF / 25 V**     | 2–3       |
+| Decoupling              | **100 nF ceramics**        | 10+       |
+| LED resistors           | **680 Ω**                  | 2         |
+| Child‑lock pull‑up      | **10 kΩ**                  | 2 (if OC) |
+| NPN drivers             | **2N2222** + **1 kΩ base** | as needed |
+| Divider for Light‑Sense | **100 kΩ + 27 kΩ**         | 1 set     |
+| Optocoupler (alt)       | **PC817** + **2.2 kΩ**     | 1         |
 
 ---
 
@@ -324,8 +360,8 @@ See [OPTIMIZATION_GUIDE.md](OPTIMIZATION_GUIDE.md) for detailed optimization inf
 ## 12) Versioning & Defaults
 
 * Default password: **1234**
-* Default timings: **5 s unlock**, **10 s auto‑lock**, **3 s keypad timeout**, **10%/s dim step**
-* Factory reset: **Hold Yellow ≥5 s on power‑up**
+* Default timings: **5 s unlock**, **10 s auto‑lock**, **3 s keypad timeout**, **10%/s dim step**
+* Factory reset: **Hold Yellow ≥5 s on power‑up**
 
 ---
 

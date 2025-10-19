@@ -19,7 +19,7 @@ void PasswordManagerTask::on_start()
     logInfo(F("Task started - 4-digit password"));
     // Load password from EEPROM if initialized
     loadPasswordFromEEPROM();
-    logInfof(F("Current password: %s"), correctPassword);
+    logInfof(F("Password: %s"), correctPassword);
 }
 
 void PasswordManagerTask::on_msg(const MsgData &msg)
@@ -75,7 +75,7 @@ void PasswordManagerTask::on_msg(const MsgData &msg)
                         resetEntryBuffer();
                         currentState = PASSWORD_CHANGE_CONFIRM;
                         logInfo(F("Password change: enter again to confirm"));
-                        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0, nullptr);
+                        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0);
                         // Give more time for password confirmation (5 seconds)
                         digitTimeoutTimer = createTimerTyped<Timer16>(5000);
                     }
@@ -89,13 +89,13 @@ void PasswordManagerTask::on_msg(const MsgData &msg)
                             savePasswordToEEPROM();
                             logInfo(F("Password change successful"));
                             // Success beep (correct password sound)
-                            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0, nullptr);
+                            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0);
                         }
                         else
                         {
                             logWarn(F("Password change mismatch"));
                             // Error beep (wrong password sound)
-                            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0, nullptr);
+                            publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0);
                         }
                         // Exit change mode
                         resetPassword();
@@ -147,7 +147,7 @@ void PasswordManagerTask::resetPassword()
 
 void PasswordManagerTask::checkPassword()
 {
-    logInfof(F("Checking %s vs %s"), enteredPassword, correctPassword);
+    logInfof(F("Check %s vs %s"), enteredPassword, correctPassword);
 
     if (strcmp(enteredPassword, correctPassword) == 0)
     {
@@ -156,10 +156,10 @@ void PasswordManagerTask::checkPassword()
         logInfo(F("Press 1=Top, 2=Front, 3=Both, 4=Child Lock"));
 
         // Publish password correct event
-        publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_CORRECT, 0, nullptr);
+        publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_CORRECT, 0);
 
         // Play correct password sound
-        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0, nullptr);
+        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_ACCEPT, 0);
 
         // Wait for door selection
         currentState = PASSWORD_WAITING_DOOR_SELECTION;
@@ -170,10 +170,10 @@ void PasswordManagerTask::checkPassword()
         logWarn(F("WRONG - no action"));
 
         // Publish password wrong event
-        publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_WRONG, 0, nullptr);
+        publish(TOPIC_PASSWORD_EVENTS, EVT_PASSWORD_WRONG, 0);
 
         // Play wrong password sound
-        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0, nullptr);
+        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_ANGRY_SOUND, 0);
 
         // Reset immediately (no blocking delay)
         resetPassword();
@@ -182,28 +182,28 @@ void PasswordManagerTask::checkPassword()
 
 void PasswordManagerTask::handleDoorSelection(uint8_t digit)
 {
-    logInfof(F("Door selection %u"), digit);
+    logInfof(F("Door %u"), digit);
 
     switch (digit)
     {
         case 1:
             logInfo(F("Releasing TOP door"));
-            publish(TOPIC_DOOR_EVENTS, EVT_DOOR_TOP_RELEASE, 0, nullptr);
+            publish(TOPIC_DOOR_EVENTS, EVT_DOOR_TOP_RELEASE, 0);
             break;
 
         case 2:
             logInfo(F("Releasing FRONT door"));
-            publish(TOPIC_DOOR_EVENTS, EVT_DOOR_FRONT_RELEASE, 0, nullptr);
+            publish(TOPIC_DOOR_EVENTS, EVT_DOOR_FRONT_RELEASE, 0);
             break;
 
         case 3:
             logInfo(F("Releasing BOTH doors"));
-            publish(TOPIC_DOOR_EVENTS, EVT_DOOR_BOTH_RELEASE, 0, nullptr);
+            publish(TOPIC_DOOR_EVENTS, EVT_DOOR_BOTH_RELEASE, 0);
             break;
 
         case 4:
             logInfo(F("Releasing CHILD LOCK"));
-            publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_RELEASE, 0, nullptr);
+            publish(TOPIC_CHILD_LOCK_EVENTS, EVT_CHILD_LOCK_RELEASE, 0);
             break;
 
         default:
@@ -224,7 +224,7 @@ void PasswordManagerTask::handleYellowShortPress()
         currentState = PASSWORD_CHANGE_ENTER;
         resetEntryBuffer();
         // Single event - buzzer will handle triple-beep pattern internally
-        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_CHANGE, 0, nullptr);
+        publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_PASSWORD_CHANGE, 0);
         // Give more time for password change (5 seconds instead of 3)
         digitTimeoutTimer = createTimerTyped<Timer16>(5000);
     }

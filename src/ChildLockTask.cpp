@@ -21,7 +21,7 @@ void ChildLockTask::on_start()
     // Start with child lock engaged (screen and power button locked)
     engageChildLock();
 
-    logInfo(F("ChildLock start"));
+    logInfo(F("Started"));
     logInfo(F("ENGAGED"));
 }
 
@@ -45,7 +45,7 @@ void ChildLockTask::on_msg(const MsgData &msg)
 
         case EVT_DEVICE_RUNNING_CHANGED:
             deviceRunning = (msg.arg == 1);
-            logInfo(F("DeviceState changed"));
+            logInfo(F("Device changed"));
             updateChildLockState();
             break;
         // Keypad special functions when child lock is disabled
@@ -90,9 +90,9 @@ void ChildLockTask::releaseChildLock()
     logInfo(F("Released"));
 
     // Play buzzer sound for child lock release
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0);
     // Update status LED to indicate child lock disabled
-    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_CHILD_UNLOCKED, 0, nullptr);
+    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_CHILD_UNLOCKED, 0);
     // Start timeout countdown
     childLockTimeoutTimer = createTimerTyped<Timer16>(CHILD_LOCK_TIMEOUT_MS);
 }
@@ -103,7 +103,7 @@ void ChildLockTask::engageChildLock()
     updateChildLockState();
     // Timer will be automatically cleared when not in use
     // Set LED back to locked state
-    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_LOCKED, 0, nullptr);
+    publish(TOPIC_STATUS_LED_EVENTS, EVT_LED_LOCKED, 0);
 }
 
 void ChildLockTask::updateChildLockState()

@@ -12,7 +12,7 @@ void YellowButtonTask::on_start()
     buttonPressed = false;
     // Timers will be initialized when button is pressed
     longPressDetected = false;
-    logInfo(F("Task started"));
+    logInfo(F("Started"));
 }
 
 void YellowButtonTask::step()
@@ -27,7 +27,7 @@ void YellowButtonTask::step()
         debounceTimer = createTimerTyped<Timer8>(DEBOUNCE_TIME_MS);
         longPressTimer = createTimerTyped<Timer16>(LONG_PRESS_TIME_MS);
         longPressDetected = false;
-        logDebug(F("Press detected"));
+        logDebug(F("Press"));
     }
     // Detect button release
     else if (currentButtonState == HIGH && lastButtonState == LOW)
@@ -40,14 +40,14 @@ void YellowButtonTask::step()
                 if (!longPressDetected)
                 {
                     // Short click
-                    logInfo(F("Short click detected"));
-                    publish(TOPIC_BUTTON_EVENTS, EVT_BUTTON_SHORT_CLICK, 0, nullptr);
+                    logInfo(F("Short click"));
+                    publish(TOPIC_BUTTON_EVENTS, EVT_BUTTON_SHORT_CLICK, 0);
                 }
                 // Long press already handled in the press-hold logic
             }
 
             buttonPressed = false;
-            logDebug(F("Release detected"));
+            logDebug(F("Release"));
         }
     }
     // Handle long press while button is held
@@ -56,8 +56,8 @@ void YellowButtonTask::step()
         if (longPressTimer.isExpired() && !longPressDetected)
         {
             longPressDetected = true;
-            logInfo(F("Long press detected"));
-            publish(TOPIC_BUTTON_EVENTS, EVT_BUTTON_LONG_CLICK, 0, nullptr);
+            logInfo(F("Long press"));
+            publish(TOPIC_BUTTON_EVENTS, EVT_BUTTON_LONG_CLICK, 0);
         }
     }
 

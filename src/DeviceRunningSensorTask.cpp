@@ -4,7 +4,7 @@ void DeviceRunningSensorTask::on_start()
 {
     pinMode(DEVICE_RUNNING_SENSOR_PIN, INPUT_PULLUP);
 
-    logInfo(F("DeviceRunning started"));
+    logInfo(F("Started"));
 
     // Read initial state
     lastDeviceRunningState = digitalRead(DEVICE_RUNNING_SENSOR_PIN);
@@ -34,8 +34,8 @@ void DeviceRunningSensorTask::readDeviceRunningSensor()
         lastDeviceRunningState = currentState;
 
         // Publish the state change
-        publish(TOPIC_DEVICE_RUNNING_EVENTS, EVT_DEVICE_RUNNING_CHANGED, currentState ? 1 : 0, nullptr);
+        publish(TOPIC_DEVICE_RUNNING_EVENTS, EVT_DEVICE_RUNNING_CHANGED, currentState ? 1 : 0);
 
-        logInfof(F("State changed to %S"), currentState ? F("RUNNING") : F("STOPPED"));
+        logInfof(F("State = %S"), currentState ? F("RUNNING") : F("STOPPED"));
     }
 }

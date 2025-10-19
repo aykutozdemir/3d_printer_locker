@@ -22,8 +22,8 @@ void StatusLEDTask::on_start()
     setLEDs(true, false);
     currentState = LED_LOCKED;
 
-    logInfo(F("Task started - Red=A1, Green=A2"));
-    logInfo(F("Initial state - LOCKED (red solid)"));
+    logInfo(F("Started - Red=A1, Green=A2"));
+    logInfo(F("Initial state - LOCKED"));
 }
 
 void StatusLEDTask::on_msg(const MsgData &msg)
@@ -35,7 +35,7 @@ void StatusLEDTask::on_msg(const MsgData &msg)
             {
                 currentState = LED_LOCKED;
                 setLEDs(true, false); // Red solid, green off
-                logInfo(F("State changed to LOCKED (red solid)"));
+                logInfo(F("State -> LOCKED"));
             }
             break;
 
@@ -44,7 +44,7 @@ void StatusLEDTask::on_msg(const MsgData &msg)
             {
                 currentState = LED_UNLOCKED;
                 setLEDs(false, true); // Red off, green solid
-                logInfo(F("State changed to UNLOCKED (green solid)"));
+                logInfo(F("State -> UNLOCKED"));
             }
             break;
 
@@ -53,7 +53,7 @@ void StatusLEDTask::on_msg(const MsgData &msg)
             {
                 currentState = LED_TO_BE_LOCKED;
                 blinkTimer = createTimerTyped<Timer16>(BLINK_INTERVAL_MS);
-                logInfo(F("State changed to TO_BE_LOCKED (red blinking)"));
+                logInfo(F("State -> TO_BE_LOCKED"));
             }
             break;
 
@@ -66,7 +66,7 @@ void StatusLEDTask::on_msg(const MsgData &msg)
                 greenLedState = true; // Start with green ON
                 redLedState = false;  // Turn off red
                 updateLEDs(); // Update immediately
-                logInfo(F("State changed to TO_BE_OPENED (green blinking)"));
+                logInfo(F("State -> TO_BE_OPENED"));
             }
             break;
 
@@ -80,7 +80,7 @@ void StatusLEDTask::on_msg(const MsgData &msg)
                 redLedState = true;
                 greenLedState = false;
                 updateLEDs();
-                logInfo(F("State changed to CHILD_UNLOCKED (alternating red/green)"));
+                logInfo(F("State -> CHILD_UNLOCKED"));
             }
             break;
 

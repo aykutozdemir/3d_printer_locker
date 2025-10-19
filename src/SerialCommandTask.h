@@ -37,5 +37,6 @@ private:
     void handleFactoryResetCommand();
     void handleSensorStatus();
     void handleMemoryInfo();
+    void handleTaskLimitCheck();
     void printUnknownCommand(const char *command);
 };

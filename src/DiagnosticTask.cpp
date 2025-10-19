@@ -22,7 +22,7 @@ void DiagnosticTask::displayResetInfo()
     ResetInfo resetInfo;
     if (OS.getResetInfo(resetInfo))
     {
-        Serial.print(F("RESET(FsmOS): R="));
+        Serial.print(F("RESET: R="));
         Serial.print(resetInfo.resetReason);
         Serial.print(F(", Task="));
         Serial.println(resetInfo.lastTaskId);

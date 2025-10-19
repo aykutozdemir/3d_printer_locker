@@ -23,7 +23,7 @@ void KeypadTask::on_start()
         keys[i].longReported = false;
     }
 
-    logInfo(F("Task started - 4-digit keypad"));
+    logInfo(F("Started - 4-digit keypad"));
 }
 
 void KeypadTask::step()
@@ -90,16 +90,16 @@ void KeypadTask::checkKey(uint8_t keyIndex, uint8_t pin, uint8_t eventType)
 
 void KeypadTask::handleKeyPress(uint8_t keyIndex, uint8_t eventType)
 {
-    logInfof(F("Key %u pressed - sending event"), keyIndex + 1);
+    logInfof(F("Key %u pressed"), keyIndex + 1);
 
     // Publish key press event
-    publish(TOPIC_KEYPAD_EVENTS, eventType, 0, nullptr);
+    publish(TOPIC_KEYPAD_EVENTS, eventType, 0);
     // Immediate beep for keypad press
-    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0, nullptr);
+    publish(TOPIC_BUZZER_EVENTS, EVT_BUZZER_BUTTON_PRESS, 0);
 }
 
 void KeypadTask::handleKeyLongPress(uint8_t keyIndex, uint8_t eventType)
 {
-    logInfof(F("Key %u long pressed - sending event"), keyIndex + 1);
-    publish(TOPIC_KEYPAD_EVENTS, eventType, 0, nullptr);
+    logInfof(F("Key %u long"), keyIndex + 1);
+    publish(TOPIC_KEYPAD_EVENTS, eventType, 0);
 }
